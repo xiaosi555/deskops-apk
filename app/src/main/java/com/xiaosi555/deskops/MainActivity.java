@@ -142,7 +142,7 @@ public class MainActivity extends Activity {
         if (fullScreenCallback != null) { fullScreenCallback.onCustomViewHidden(); fullScreenCallback = null; }
     }
 
-    private class AndroidBridge {
+    public class AndroidBridge {
         @JavascriptInterface public void pickMediaFolder(String id, String kind) {
             runOnUiThread(() -> {
                 pendingRequest = id; pendingKind = kind;
