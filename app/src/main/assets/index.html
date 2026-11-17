@@ -12032,7 +12032,7 @@ render();
   catch(e){delete nativeTtsPending[id];fail('native-tts');}
  };
  var oldHalt=ttsHaltAudio;
- ttsHaltAudio=function(){try{window.AndroidMedia.stopTts();}catch(e){}return oldHalt.apply(this,arguments);};
+ ttsHaltAudio=function(){nativeTtsPending=Object.create(null);try{window.AndroidMedia.stopTts();}catch(e){}return oldHalt.apply(this,arguments);};
  var oldKeepNote=mediaKeepNote;
  mediaKeepNote=function(items,cb){
   var wrap=oldKeepNote.apply(this,arguments);
