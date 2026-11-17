@@ -95,7 +95,16 @@ public class MainActivity extends Activity {
                 }
                 return assetLoader.shouldInterceptRequest(u);
             }
-            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) { return false; }
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
+                Uri target = req.getUrl();
+                if ("appassets.androidplatform.net".equals(target.getHost())) return false;
+                if (req.isForMainFrame()) {
+                    try { startActivity(new Intent(Intent.ACTION_VIEW, target)); }
+                    catch (ActivityNotFoundException ignored) { Toast.makeText(MainActivity.this, "没有可打开此链接的应用", Toast.LENGTH_SHORT).show(); }
+                    return true;
+                }
+                return false;
+            }
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 if (url != null && url.startsWith("https://appassets.androidplatform.net/assets/index.html")) {
