@@ -113,9 +113,9 @@
 ## 二、数据保存与隐私说明
 
 - 原始 HTML 应用以本地单文件应用方式运行，学习状态、划线、案例、术语和个人设置主要保存在当前应用 WebView 的本地浏览器存储中。
-- 本 Android 包使用本地 assets/index.html 作为页面入口，并通过 AndroidX WebKit 的本地资源加载机制提供安全的本地 HTTPS 页面来源，以支持 Web 存储能力。
+- 本 Android 包使用本地 assets/index.html 作为页面入口，并通过 AndroidX WebKit 的本地资源加载机制提供安全的本地 HTTPS 页面来源，以支持 Web 存储能力。Android 原生桥接层补齐了 WebView 不完整支持的系统文件夹选择、媒体流读取、系统 TTS、剪贴板和文件保存能力。
 - 本地学习数据不会因为构建 APK 就自动同步到云端或其他设备。
-- 选择在线语音功能时，朗读文本会按该功能说明发送到对应在线语音服务；使用系统语音时不需要在线发送朗读文本。
+- Android 版优先使用手机系统 TextToSpeech，可读取设备实际提供的音色并调整语速；不可用时仍可使用应用内在线语音来源或专注阅读。选择在线语音功能时，朗读文本会按该功能说明发送到对应在线语音服务；使用系统语音时不需要在线发送朗读文本。
 - 卸载应用、清除应用数据或更换设备可能导致本地数据无法继续访问，请提前导出备份。
 
 ## 三、Android 版本与实现方式
@@ -127,12 +127,15 @@
 | 最低 Android 版本 | Android 6.0（API 23） |
 | 编译 / 目标 SDK | API 35 |
 | Java | 17 |
-| 页面容器 | Android WebView |
+| 页面容器 | Android WebView + Android 原生能力桥接 |
 | 本地页面 | app/src/main/assets/index.html |
 | 本地资源加载 | AndroidX WebKit WebViewAssetLoader |
+| 文件夹 / 文件访问 | Storage Access Framework（SAF） |
+| 媒体播放 | 本地流式读取，支持 HTTP Range 分段请求 |
+| 系统朗读 | Android TextToSpeech |
 | 页面技术 | HTML + CSS + JavaScript |
 
-Android 外壳负责启动本地 HTML、启用 JavaScript 与 DOM Storage、处理应用内页面导航和系统返回操作。应用界面的主体仍由原始 HTML 页面负责。
+Android 外壳负责启动本地 HTML、启用 JavaScript 与 DOM Storage、通过 SAF 选择文件 / 文件夹、向 WebView 提供媒体流、提供系统 TTS、剪贴板和系统保存对话框，并将手机系统返回键交给 HTML 应用自身的导航栈处理。应用界面的主体仍由原始 HTML 页面负责；本次兼容性修复未重做各主题的 CSS 版式，原主题色、亮暗模式和页面风格仍由原 HTML 控制。
 
 ## 四、仓库目录
 
