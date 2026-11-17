@@ -439,7 +439,15 @@ public class MainActivity extends Activity {
     @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);if(webView!=null)webView.saveState(out);}
     @Override public void onBackPressed(){
         if(fullScreenView!=null){hideFullScreen();return;}
-        if(webView!=null&&webView.canGoBack())webView.goBack();else super.onBackPressed();
+        if(webView!=null){
+            webView.evaluateJavascript("(window.__androidHandleBack&&window.__androidHandleBack())===true", value -> {
+                if ("true".equals(value)) return;
+                if (webView != null && webView.canGoBack()) webView.goBack();
+                else finish();
+            });
+            return;
+        }
+        super.onBackPressed();
     }
     @Override protected void onDestroy(){
         if(fileCallback!=null)fileCallback.onReceiveValue(null);
