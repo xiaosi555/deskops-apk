@@ -143,7 +143,6 @@ public class MainActivity extends Activity {
                 pendingRequest = id; pendingKind = kind;
                 Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*");
-                i.putExtra(Intent.EXTRA_MIME_TYPES, "video".equals(kind) ? new String[]{"video/*"} : new String[]{"audio/*"});
                 i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
                 i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
                 try { startActivityForResult(i, PICK_FILES); }
@@ -153,7 +152,11 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void registerMediaUri(String id, String uriText) {
             runOnUiThread(() -> {
                 try {
-                    Uri u = Uri.parse(uriText); String key = register(u, querySize(u));
+                    Uri u = Uri.parse(uriText);
+                    try (InputStream probe = getContentResolver().openInputStream(u)) {
+                        if (probe == null) throw new IllegalStateException("Media permission expired");
+                    }
+                    String key = register(u, querySize(u));
                     JSONObject o = new JSONObject(); o.put("id", key); o.put("url", mediaUrl(key));
                     finishRequest(id, o);
                 } catch (Exception e) { finishRequest(id, new JSONObject()); }
@@ -383,8 +386,12 @@ public class MainActivity extends Activity {
             if(range!=null&&size>0){
                 Matcher m=Pattern.compile("bytes=(\\d*)-(\\d*)").matcher(range.trim());
                 if(m.matches()){
-                    long start=m.group(1).isEmpty()?0:Long.parseLong(m.group(1));
-                    long end=m.group(2).isEmpty()?size-1:Long.parseLong(m.group(2));
+                    long start, end;
+                    if(m.group(1).isEmpty()){
+                        long suffix=Long.parseLong(m.group(2));start=Math.max(0,size-suffix);end=size-1;
+                    }else{
+                        start=Long.parseLong(m.group(1));end=m.group(2).isEmpty()?size-1:Long.parseLong(m.group(2));
+                    }
                     if(start>=size||end<start){in.close();headers.put("Content-Range","bytes */"+size);return response(mime,416,"Range Not Satisfiable",headers,new ByteArrayInputStream(new byte[0]));}
                     end=Math.min(end,size-1);long skip=start;
                     while(skip>0){long n=in.skip(skip);if(n<=0){if(in.read()==-1)break;n=1;}skip-=n;}
