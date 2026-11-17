@@ -40,6 +40,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,6 +56,7 @@ public class MainActivity extends Activity {
     private final Map<String, Uri> mediaUris = new ConcurrentHashMap<>();
     private final Map<String, Long> mediaSizes = new ConcurrentHashMap<>();
     private final AtomicInteger mediaSerial = new AtomicInteger();
+    private final ExecutorService io = Executors.newFixedThreadPool(2);
     private String pendingRequest, pendingKind, saveName, saveMime;
     private byte[] saveBytes;
     private TextToSpeech tts;
@@ -162,7 +165,7 @@ public class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void registerMediaUri(String id, String uriText) {
-            runOnUiThread(() -> {
+            io.execute(() -> {
                 try {
                     Uri u = Uri.parse(uriText);
                     try (InputStream probe = getContentResolver().openInputStream(u)) {
@@ -369,21 +372,24 @@ public class MainActivity extends Activity {
         String id=pendingRequest, kind=pendingKind; pendingRequest=null; pendingKind=null;
         if(id==null)return;
         if(code!=RESULT_OK||data==null){JSONObject o=new JSONObject();try{o.put("cancelled",true);}catch(Exception ignored){}finishRequest(id,o);return;}
-        try {
-            JSONObject result;
-            if(folder){
-                Uri tree=data.getData(); if(tree==null)throw new IllegalStateException("No folder");
-                int flags=data.getFlags()&(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                try{getContentResolver().takePersistableUriPermission(tree,flags|Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(SecurityException ignored){}
-                result=folderResult(tree,kind);
-            } else result=pickedFiles(data,kind);
-            finishRequest(id,result);
-        } catch(Exception e) {
-            JSONObject o=new JSONObject();try{o.put("items",new JSONArray());}catch(Exception ignored){}
-            finishRequest(id,o);Toast.makeText(this,"读取媒体文件失败，请换一个文件夹或文件",Toast.LENGTH_LONG).show();
-        }
+        final Intent picked = data;
+        io.execute(() -> {
+            try {
+                JSONObject result;
+                if(folder){
+                    Uri tree=picked.getData(); if(tree==null)throw new IllegalStateException("No folder");
+                    int flags=picked.getFlags()&(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    try{getContentResolver().takePersistableUriPermission(tree,flags|Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(SecurityException ignored){}
+                    result=folderResult(tree,kind);
+                } else result=pickedFiles(picked,kind);
+                finishRequest(id,result);
+            } catch(Exception e) {
+                JSONObject o=new JSONObject();try{o.put("items",new JSONArray());}catch(Exception ignored){}
+                finishRequest(id,o);
+                runOnUiThread(() -> Toast.makeText(MainActivity.this,"读取媒体文件失败，请换一个文件夹或文件",Toast.LENGTH_LONG).show());
+            }
+        });
     }
-
     private WebResourceResponse streamMedia(String id, Map<String,String> reqHeaders) {
         Uri uri=mediaUris.get(id);
         if(uri==null)return response("text/plain",404,"Not Found",new HashMap<>(),new ByteArrayInputStream(new byte[0]));
@@ -471,6 +477,7 @@ public class MainActivity extends Activity {
     @Override protected void onDestroy(){
         if(fileCallback!=null)fileCallback.onReceiveValue(null);
         if(tts!=null){tts.stop();tts.shutdown();}
+        io.shutdownNow();
         if(webView!=null){webView.stopLoading();webView.removeJavascriptInterface("AndroidMedia");webView.destroy();}
         super.onDestroy();
     }
