@@ -997,7 +997,6 @@ html .tile .bdg{position:static;margin:0 0 0 2px;background:var(--pri)}
 .io-seg button.on{border-color:var(--accent-line);color:var(--pri);background:var(--accent-wash)}
 textarea.io-ta{min-height:110px;font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .cmrow-act{display:flex;align-items:center;gap:0;flex:0 0 auto}
-
 /* =====================================================================
    动效：页面进入、列表错落、按压水波、进度生长、数字滚动
    ===================================================================== */
@@ -1997,8 +1996,7 @@ html .tile+.tile{box-shadow:inset 1px 0 0 var(--hairc)}
 .fg .fg-tabs button small{display:none}
 .fg .fg-tabs button.on{background:none;color:var(--pri);font-weight:700;box-shadow:inset 0 -2px 0 var(--pri)}
 .fg .fg-scopes{gap:18px;padding:12px 0 4px}
-.fg .fg-scopes .chip2{background:none;border:0;border-radius:0;padding:2px 0;font-size:13.5px;color:var(--sub);box-shadow:none;white-space:nowrap}
-.fg .fg-scopes .chip2.on{color:var(--pri);font-weight:700;background:none;box-shadow:inset 0 -2px 0 var(--pri)}
+.fg .fg-scopes .chip2{background:none;border:0;border-radius:0;padding:2px 0;font-size:13.5px;color:var(--sub);box-shadow:none;white-space:nowrap}.fg .fg-scopes .chip2.on{color:var(--pri);font-weight:700;background:none;box-shadow:inset 0 -2px 0 var(--pri)}
 .fg .fg-lead{margin:12px 2px 6px;color:var(--sub);font-size:13.5px}
 .fg .fg-lead b{color:var(--ink)}
 .fg .fg-tbl table{background:none;border-radius:0}
@@ -2997,8 +2995,7 @@ let CH=[
 
 {id:'D3',m:'D',t:'文件共享与协作',s:'权限问题永远有两层',
  terms:'SMB 版本与 445 端口｜共享权限 vs NTFS 权限（取交集）｜DFS 命名空间与复制｜映射驱动器｜存储配额与文件筛选｜内网网盘／SharePoint／OneDrive 的角色差异',
- plain:[['共享权限','小区大门的门禁'],
-  ['NTFS 权限','每套房自己的门锁'],
+ plain:[['共享权限','小区大门的门禁'],  ['NTFS 权限','每套房自己的门锁'],
   ['取交集','两把锁必须都放行才进得去，限制更严的那层说了算'],
   ['DFS','给散在各楼的仓库挂同一块招牌，用户不用记地址'],
   ['映射驱动器','把某间仓库变成我的 Z 盘'],
@@ -3997,8 +3994,7 @@ function chapterDigest(c){
  (c.cmds||[]).forEach(x=>L.push('$ '+x.c+'  ('+x.n+')'));
  (d.out||[]).forEach(([cmd,rep])=>{L.push('$ '+cmd,'预期输出：',rep);});
  (d.flow||[]).forEach(([t,steps])=>L.push('','■ '+t,steps));
- L.push('','■ 避坑');
- (c.pits||[]).forEach(p=>L.push('错误：'+p.w,'  后果：'+p.c,'  正确：'+p.r));
+ L.push('','■ 避坑'); (c.pits||[]).forEach(p=>L.push('错误：'+p.w,'  后果：'+p.c,'  正确：'+p.r));
  L.push('','■ 过关标准',c.gate,'','■ 练习题',c.quiz.q,'','参考答案',c.quiz.a);
  return L.join('\n');
 }
@@ -4997,8 +4993,7 @@ function renderImportPreview(){
  box.appendChild(h('h3',null,'待导入存档 · '+new Date(o.exportedAt||Date.now()).toLocaleString('zh-CN')+'　（v'+(o.ver||3)+'）'));
  const ul=h('ul','pl');
  [[(S.marks||[]).length,ic.marks,'划线'],[(S.cases||[]).length,ic.cases,'案例'],[(S.gloss||[]).length,ic.gloss,'自填术语'],[Object.keys(S.learn||{}).length,ic.learned,'已学章节'],[Object.keys(S.status||{}).filter(function(k){return S.status[k]==='green';}).length,ic.pass,'已过关']]
-  .forEach(function(r){ul.appendChild(h('li',null,r[2]+'：存档 '+r[1]+'　当前 '+r[0]));});
- box.appendChild(ul);
+  .forEach(function(r){ul.appendChild(h('li',null,r[2]+'：存档 '+r[1]+'　当前 '+r[0]));}); box.appendChild(ul);
  const btns=h('div','btns');
  const m1=h('button','btn sm'+(pendingImp.mode==='merge'?' pri':''),'合并（保留两边，重复跳过）');
  const m2=h('button','btn sm'+(pendingImp.mode==='cover'?' pri':''),'覆盖（以存档为准）');
@@ -5997,8 +5992,7 @@ function renderPlay(){
  CMDS.filter(x=>!kw||x.join(' ').toLowerCase().indexOf(kw)>=0).forEach(x=>{
   const tr=h('tr');tr.appendChild(h('td',null,x[0]));tr.appendChild(h('td',null,x[1]));tr.appendChild(h('td',null,x[2]));cb.appendChild(tr);
  });
- const eb=document.getElementById('evBody');eb.textContent='';
- const ekw=(document.getElementById('evSearch').value||'').trim().toLowerCase();
+ const eb=document.getElementById('evBody');eb.textContent=''; const ekw=(document.getElementById('evSearch').value||'').trim().toLowerCase();
  EVENTS.filter(x=>!ekw||x.join(' ').toLowerCase().indexOf(ekw)>=0).forEach(x=>{
   const tr=h('tr');x.forEach((v,i)=>tr.appendChild(h(i===0?'td':'td',null,v)));eb.appendChild(tr);
  });
@@ -6997,8 +6991,7 @@ function repairFromHandbook(c){
  while((m=re.exec(hb)))secs.push({id:m[1],title:m[2].trim(),start:m.index});
  secs.forEach(function(s,i){s.end=i+1<secs.length?secs[i+1].start:hb.length;});
  if(!secs.length)return;
- c.long=c.long||{};c.deep=c.deep||{};
- c.chapters.forEach(function(x){
+ c.long=c.long||{};c.deep=c.deep||{}; c.chapters.forEach(function(x){
   if(!x||!x.id)return;
   const sec=secs.filter(function(s){return s.id===String(x.id);})[0];if(!sec)return;
   const P=parseHandbookChapter(hb.slice(sec.start,sec.end));
@@ -7997,8 +7990,7 @@ let stLast=Date.now(),stAcc=0;
 setInterval(function(){
  if(document.hidden||!STUDY_VIEWS[view]||Date.now()-stLast>120000)return;
  const k=today();S.ui.studyLog=S.ui.studyLog||{};
- S.ui.studyLog[k]=Math.round(((Number(S.ui.studyLog[k])||0)+5/60)*1000)/1000;
- stAcc+=5;if(stAcc>=30){stAcc=0;save();}
+ S.ui.studyLog[k]=Math.round(((Number(S.ui.studyLog[k])||0)+5/60)*1000)/1000; stAcc+=5;if(stAcc>=30){stAcc=0;save();}
 },5000);
 window.addEventListener('pagehide',function(){save();});
 document.addEventListener('visibilitychange',function(){if(document.hidden)save();});
@@ -8997,8 +8989,7 @@ function openFocusReader(blocks,start){
  bar.appendChild(prev);bar.appendChild(auto);bar.appendChild(sp);bar.appendChild(nx);
  ov.appendChild(top);ov.appendChild(body);ov.appendChild(bar);document.body.appendChild(ov);
  FR={el:ov,i:Math.max(0,Math.min(start||0,blocks.length-1)),auto:false,t:0};
- function paint(){
-  const b=blocks[FR.i];txt.textContent=b.text;body.scrollTop=0;cnt.textContent=(FR.i+1)+' / '+blocks.length;
+ function paint(){  const b=blocks[FR.i];txt.textContent=b.text;body.scrollTop=0;cnt.textContent=(FR.i+1)+' / '+blocks.length;
   prev.disabled=FR.i===0;nx.disabled=FR.i===blocks.length-1;
   ttsMarkNow(b.el);schedule();
  }
@@ -9038,7 +9029,8 @@ function openTtsSettings(){
   const e=cfg.engine;
   if(e==='auto'||e==='system'){
    const sel=document.createElement('select');
-   let vs=[];try{vs=ttsSupported()?speechSynthesis.getVoices():[];}catch(x){}
+   let vs=[];try{vs=ttsSupported()&&window.speechSynthesis?speechSynthesis.getVoices():[];}catch(x){}
+   if(!vs.length&&window.__androidTtsVoices)vs=window.__androidTtsVoices.map(function(v){return {voiceURI:v.id,name:v.name,lang:v.lang};});
    const zh=vs.filter(function(v){return /zh|cmn|yue/i.test(v.lang);});
    const o0=document.createElement('option');o0.value='';o0.textContent=zh.length?'自动选择中文音色':(ttsSupported()?'（暂未读到音色，使用系统默认）':'（此浏览器不支持系统朗读）');sel.appendChild(o0);
    zh.forEach(function(v){const o=document.createElement('option');o.value=v.voiceURI||v.name;o.textContent=v.name+' · '+v.lang;sel.appendChild(o);});
@@ -9301,7 +9293,8 @@ function openTtsSettings(){
   const e=cfg.engine;
   if(e==='auto'||e==='system'){
    const sel=document.createElement('select');
-   let vs=[];try{vs=ttsSupported()?speechSynthesis.getVoices():[];}catch(x){}
+   let vs=[];try{vs=ttsSupported()&&window.speechSynthesis?speechSynthesis.getVoices():[];}catch(x){}
+   if(!vs.length&&window.__androidTtsVoices)vs=window.__androidTtsVoices.map(function(v){return {voiceURI:v.id,name:v.name,lang:v.lang};});
    const zh=vs.filter(function(v){return /zh|cmn|yue/i.test(v.lang);});
    const o0=document.createElement('option');o0.value='';o0.textContent=zh.length?'自动选择中文音色':(ttsSupported()?'（暂未读到音色，使用系统默认）':'（此浏览器不支持系统朗读）');sel.appendChild(o0);
    zh.forEach(function(v){const o=document.createElement('option');o.value=v.voiceURI||v.name;o.textContent=v.name+' · '+v.lang;sel.appendChild(o);});
@@ -9995,8 +9988,7 @@ function deleteCourse(id){
  var co=COURSES.find(function(c){return c.id===id;});if(!co)return false;
  var next=COURSES.find(function(c){return c.id!==id;});if(!next)return false;
  S.ui=S.ui||{};
- if(co.custom)S.ui.userCourses=(S.ui.userCourses||[]).filter(function(x){return x.id!==id;});
- else{S.ui.deletedCourses=S.ui.deletedCourses||[];if(S.ui.deletedCourses.indexOf(id)<0)S.ui.deletedCourses.push(id);}
+ if(co.custom)S.ui.userCourses=(S.ui.userCourses||[]).filter(function(x){return x.id!==id;}); else{S.ui.deletedCourses=S.ui.deletedCourses||[];if(S.ui.deletedCourses.indexOf(id)<0)S.ui.deletedCourses.push(id);}
  if(S.ui.co)delete S.ui.co[id];
  if(S.ui.star)delete S.ui.star[id];
  if(Array.isArray(S.ui.shortcuts))S.ui.shortcuts=S.ui.shortcuts.filter(function(it){return it.target!=='course:'+id;});
@@ -10995,8 +10987,7 @@ openScEditor=function(idx){
    var rSl=range(0,30,1,Math.min(30,scR(it)),function(v){it.r=v;paintPv();pane.querySelectorAll('.gv')[2].textContent=v+'px';rRow.querySelectorAll('.sce2-chip').forEach(function(x){x.classList.remove('on');});});
    pane.appendChild(group('圆角',scR(it)>=99?'胶囊':scR(it)+'px',rRow,rSl));
   }
- }
- paintPane();paintPv();
+ } paintPane();paintPv();
  var opts={cls:'sc-sheet'};
  if(!isNew){opts.cancelText='移除';opts.danger=true;opts.onCancel=function(){
   var nmx=(list[idx]&&list[idx].name)||'这个入口';
@@ -11908,5 +11899,179 @@ applyDeco();
 render();
 }());
 </script>
+
+<script id="v19-android-compat">
+/* Android WebView compatibility: SAF media folders, persistent media URI reconnect, native export */
+(function(){
+ 'use strict';
+ if(!window.AndroidMedia)return;
+
+ var pending=Object.create(null),serial=0;
+ function requestNative(method,args){
+  return new Promise(function(resolve){
+   var id='am'+(++serial)+'_'+Date.now();
+   pending[id]=resolve;
+   try{window.AndroidMedia[method].apply(window.AndroidMedia,[id].concat(args||[]));}
+   catch(e){delete pending[id];resolve(null);}
+  });
+ }
+ window.__nativeMediaResult=function(id,payload){
+  var fn=pending[id];if(!fn)return;delete pending[id];
+  try{fn(payload?JSON.parse(payload):null);}catch(e){fn(null);}
+ };
+ function nativeItems(result,kind){
+  if(!result||!Array.isArray(result.items))return null;
+  var items=result.items.filter(function(x){
+   var f={name:x.name||'',size:Number(x.size)||0,lastModified:Number(x.mtime)||0,type:x.mime||'',webkitRelativePath:x.rel||x.name||''};
+   f._nativeUri=x.uri||'';f._nativeId=x.id||'';f._nativeUrl=x.url||'';
+   return mediaKindOf(f)===kind;
+  }).map(function(x){
+   var f={name:x.name||'',size:Number(x.size)||0,lastModified:Number(x.mtime)||0,type:x.mime||'',webkitRelativePath:x.rel||x.name||''};
+   f._nativeUri=x.uri||'';f._nativeId=x.id||'';f._nativeUrl=x.url||'';
+   var parts=String(x.rel||x.name||'').split('/');
+   return toItem(f,parts.length>1?parts[0]:'',x.rel||x.name||'');
+  });
+  return {items:items,name:result.name||'',native:true};
+ }
+ var oldPickFolder=pickFolder;
+ pickFolder=function(kind){
+  return requestNative('pickMediaFolder',[kind]).then(function(r){
+   if(r&&Array.isArray(r.items))return nativeItems(r,kind);
+   /* Native picker was cancelled or unavailable: retain the browser fallback. */
+   return oldPickFolder(kind);
+  });
+ };
+ var oldPickFiles=pickFiles;
+ pickFiles=function(kind){
+  return requestNative('pickMediaFiles',[kind]).then(function(r){
+   if(r&&Array.isArray(r.items))return nativeItems(r,kind);
+   return oldPickFiles(kind);
+  });
+ };
+ var oldCreateMediaCourse=createMediaCourse;
+ createMediaCourse=function(kind,title,items,by,dir,dirHandle){
+  var id=oldCreateMediaCourse(kind,title,items,by,dir,dirHandle);
+  var co=COURSES.find(function(c){return c.id===id;});
+  if(co){
+   var p=packOf(co);
+   p.ch.forEach(function(c){
+    var it=items.find(function(x){return x.rel===c.media.rel||(x.fname===c.media.fname&&x.size===c.media.size);});
+    if(it&&it.file&&it.file._nativeUri)c.media.nativeUri=it.file._nativeUri;
+   });
+   syncCourses();save();
+  }
+  return id;
+ };
+ var oldAttachFiles=attachFiles;
+ attachFiles=function(courseId,items){
+  var n=oldAttachFiles(courseId,items),co=COURSES.find(function(c){return c.id===courseId;});
+  if(co){
+   packOf(co).ch.forEach(function(c){
+    var it=items.find(function(x){return x.rel===c.media.rel||(x.fname===c.media.fname&&x.size===c.media.size);});
+    if(it&&it.file&&it.file._nativeUri)c.media.nativeUri=it.file._nativeUri;
+   });
+   syncCourses();save();
+  }
+  return n;
+ };
+ var oldPersist=window.mediaPersist;
+ window.mediaPersist=async function(co,items,keep,dirHandle){
+  var nativeOnly=(items||[]).length>0&&(items||[]).every(function(x){return x.file&&x.file._nativeUri;});
+  if(nativeOnly){
+   if(co){var p=packOf(co);p.ch.forEach(function(c){
+    var it=items.find(function(x){return x.rel===c.media.rel||(x.fname===c.media.fname&&x.size===c.media.size);});
+    if(it&&it.file&&it.file._nativeUri)c.media.nativeUri=it.file._nativeUri;
+   });syncCourses();save();}
+   toast('已保存系统文件访问授权，下次打开可自动重新连接');
+   return;
+  }
+  if(oldPersist)return oldPersist.apply(this,arguments);
+ }; var oldRelink=window.relinkMedia;
+ window.relinkMedia=async function(courseId,interactive,onlyCh){
+  var ok=false;
+  try{if(oldRelink)ok=await oldRelink.apply(this,arguments);}catch(e){}
+  var co=COURSES.find(function(c){return c.id===courseId;});if(!co||!co.media)return ok;
+  var rows=packOf(co).ch.filter(function(c){return c.media&&c.media.nativeUri&&(!onlyCh||c.id===onlyCh);});
+  for(var i=0;i<rows.length;i++){
+   var c=rows[i],key=courseId+':'+c.id;if(MEDIA[key])continue;
+   try{
+    var r=await requestNative('registerMediaUri',[c.media.nativeUri]);
+    if(r&&r.url){MEDIA[key]={file:null,url:r.url,nativeUri:c.media.nativeUri};ok=true;}
+   }catch(e){}
+  }
+  return ok;
+ };
+ function mediaUrl(reg){
+  if(reg&&reg.url)return reg.url;
+  if(reg&&reg.file)return URL.createObjectURL(reg.file);
+  return '';
+ }
+ /* Player and metadata probing use a streamed SAF URL for native files instead of trying to
+    create a Blob from a JavaScript placeholder object. */
+ var oldRenderPlayer=renderPlayer;
+ renderPlayer=function(){
+  oldRenderPlayer.apply(this,arguments);
+  var c=curChapter(),co=curCourse();if(!c||!co||!c.media)return;
+  var reg=MEDIA[co.id+':'+c.id],el=document.querySelector('#v-player .media-el');
+  if(reg&&reg.url&&el&&el.src!==reg.url)el.src=reg.url;
+ };
+ var oldProbe=probeDurations;
+ probeDurations=async function(courseId){
+  var co=COURSES.find(function(c){return c.id===courseId;});if(!co||!co.media)return oldProbe.apply(this,arguments);
+  /* Native URL sources are probed without object-URL allocation. */
+  var p=packOf(co);
+  for(var i=0;i<p.ch.length;i++){
+   var c=p.ch[i],reg=MEDIA[courseId+':'+c.id];if(!c.media||c.media.dur||!reg)continue;
+   var src=reg.url||(reg.file?URL.createObjectURL(reg.file):'');if(!src)continue;
+   var dur=await new Promise(function(res){
+    var el=document.createElement(co.media==='video'?'video':'audio'),done=false;
+    var fin=function(v){if(done)return;done=true;el.removeAttribute('src');try{el.load();}catch(e){}if(reg.file&&!reg.url)try{URL.revokeObjectURL(src);}catch(e){}res(v);};
+    el.preload='metadata';el.onloadedmetadata=function(){fin(isFinite(el.duration)?el.duration:0);};el.onerror=function(){fin(0);};setTimeout(function(){fin(0);},7000);el.src=src;
+   });
+   if(dur){c.media.dur=Math.round(dur);c.s=fmtClock(dur)+' · '+fmtSize(c.media.size);}
+  }
+  save();if(view==='course'||view==='today'||view==='player')render();
+ };
+ /* Video poster helpers accept either a File/Blob or a native streamed URL. */
+ var oldFrameBlob=frameBlob;
+ frameBlob=function(file,t){
+  if(typeof file!=='string')return oldFrameBlob(file,t);
+  return new Promise(function(res){
+   var v=document.createElement('video'),done=false,tm=setTimeout(function(){fin(null);},12000);
+   function fin(b){if(done)return;done=true;clearTimeout(tm);try{v.pause();v.removeAttribute('src');v.load();}catch(e){}res(b);}
+   v.muted=true;v.preload='auto';v.setAttribute('playsinline','');v.onerror=function(){fin(null);};
+   v.onloadedmetadata=function(){var d=v.duration||0;try{v.currentTime=d?Math.min(Math.max(.05,t),Math.max(.05,d-.2)):Math.max(.05,t);}catch(e){fin(null);}};
+   v.onseeked=function(){try{var W=360,r=v.videoWidth&&v.videoHeight?v.videoWidth/v.videoHeight:16/9,hh=Math.max(1,Math.round(W/r)),cv=document.createElement('canvas');cv.width=W;cv.height=hh;cv.getContext('2d').drawImage(v,0,0,W,hh);cv.toBlob(function(b){fin(b);},'image/jpeg',.72);}catch(e){fin(null);}};
+   v.src=file;
+  });
+ };
+ var oldMakePoster=makePoster;
+ makePoster=function(co,c,t){
+  var reg=MEDIA[pkey(co,c)];if(reg&&reg.url)return oldMakePoster.call(this,co,c,t);return oldMakePoster.apply(this,arguments);
+ };
+ var oldOpenPoster=window.openVideoPosterSheet;
+ if(oldOpenPoster)window.openVideoPosterSheet=function(co,c){
+  var reg=MEDIA[pkey(co,c)];
+  if(reg&&reg.url&&!reg.file){
+   /* Poster UI can still use the native stream URL as its preview source. */
+   var oldCreate=URL.createObjectURL;
+   URL.createObjectURL=function(x){return x===reg.file?reg.url:oldCreate.call(URL,x);};
+   try{return oldOpenPoster.apply(this,arguments);}finally{URL.createObjectURL=oldCreate;}
+  }
+  return oldOpenPoster.apply(this,arguments);
+ };
+ /* Android WebView does not reliably download blob: links. Save through the Storage Access Framework. */
+ var oldSaveBlob=window.saveBlob;
+ window.saveBlob=function(name,mime,content,withBom){
+  try{
+   var text=(withBom?'\uFEFF':'')+String(content==null?'':content);
+   var b64=btoa(unescape(encodeURIComponent(text)));
+   window.AndroidMedia.saveTextFile(name,mime,b64);
+   return true;
+  }catch(e){return oldSaveBlob?oldSaveBlob.apply(this,arguments):false;}
+ };
+})();
+</script>
+
 </body>
 </html>
