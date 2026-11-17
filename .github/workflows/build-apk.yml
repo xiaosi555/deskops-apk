@@ -1,15 +1,15 @@
-name: Build Android APK
+name: Build Native Android APK
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, native-android-rebuild]
 
 permissions:
   contents: read
 
 concurrency:
-  group: deskops-apk-${{ github.ref }}
+  group: deskops-native-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -44,7 +44,7 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build debug APK
+      - name: Build native debug APK
         run: gradle --no-daemon assembleDebug
 
       - name: Verify APK output
@@ -55,12 +55,12 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: deskops-debug-apk
+          name: deskops-native-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Android emulator startup smoke test
+      - name: Native Android emulator smoke test
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -73,16 +73,13 @@ jobs:
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -n com.xiaosi555.deskops/.MainActivity
             for i in $(seq 1 30); do
-              if adb logcat -d -s DeskOpsSmoke:I | grep -q "APP_PAGE_READY"; then break; fi
+              if adb logcat -d -s DeskOpsNativeSmoke:I | grep -q "NATIVE_APP_READY"; then break; fi
               sleep 2
             done
-            LOG="$(adb logcat -d -s DeskOpsSmoke:I)"
+            LOG="$(adb logcat -d -s DeskOpsNativeSmoke:I)"
             echo "$LOG"
-            echo "$LOG" | grep -q "APP_PAGE_READY"
-            echo "$LOG" | grep -q '"bridge":true'
-            echo "$LOG" | grep -q '"mediaPicker":true'
-            echo "$LOG" | grep -q '"tts":true'
-            echo "$LOG" | grep -q '"back":true'
+            echo "$LOG" | grep -q "NATIVE_APP_READY"
+            adb shell dumpsys activity activities | grep -q "com.xiaosi555.deskops"
             if adb logcat -d -s AndroidRuntime:E | grep -q "FATAL EXCEPTION"; then
               echo "Android runtime crash detected"
               exit 1
