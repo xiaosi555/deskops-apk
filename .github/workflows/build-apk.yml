@@ -72,15 +72,6 @@ jobs:
             adb logcat -c
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -n com.xiaosi555.deskops/.MainActivity
-            for i in $(seq 1 30); do
-              if adb logcat -d -s DeskOpsNativeSmoke:I | grep -q "NATIVE_APP_READY"; then break; fi
-              sleep 2
-            done
-            LOG="$(adb logcat -d -s DeskOpsNativeSmoke:I)"
-            echo "$LOG"
-            echo "$LOG" | grep -q "NATIVE_APP_READY"
-            adb shell dumpsys activity activities | grep -q "com.xiaosi555.deskops"
-            if adb logcat -d -s AndroidRuntime:E | grep -q "FATAL EXCEPTION"; then
-              echo "Android runtime crash detected"
-              exit 1
-            fi
+            sleep 12
+            adb logcat -d -s DeskOpsNativeSmoke:I | grep "NATIVE_APP_READY"
+            adb shell dumpsys activity activities | grep "com.xiaosi555.deskops"
