@@ -15,6 +15,7 @@ import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.view.View;
 import android.view.WindowManager;
+import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -92,6 +93,17 @@ public class MainActivity extends Activity {
                 return assetLoader.shouldInterceptRequest(u);
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) { return false; }
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (url != null && url.startsWith("https://appassets.androidplatform.net/assets/index.html")) {
+                    String probe = "(function(){return JSON.stringify({title:document.title,bridge:!!window.AndroidMedia,"
+                            + "mediaPicker:!!(window.AndroidMedia&&typeof window.AndroidMedia.pickMediaFolder==='function'),"
+                            + "tts:!!(window.AndroidMedia&&typeof window.AndroidMedia.speakTts==='function'),"
+                            + "back:typeof window.__androidHandleBack==='function',shell:!!document.querySelector('.app'),"
+                            + "theme:document.documentElement.getAttribute('data-theme')});})()";
+                    view.evaluateJavascript(probe, value -> Log.i("DeskOpsSmoke", "APP_PAGE_READY:" + value));
+                }
+            }
         });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> cb, FileChooserParams p) {
