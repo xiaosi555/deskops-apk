@@ -11907,6 +11907,21 @@ render();
  if(!window.AndroidMedia)return;
 
  var pending=Object.create(null),serial=0;
+ var realCreateObjectURL=URL.createObjectURL;
+ URL.createObjectURL=function(obj){return obj&&obj._nativeUrl?obj._nativeUrl:realCreateObjectURL.call(URL,obj);};
+ window.__androidHandleBack=function(){
+  try{
+   if(typeof view!=='undefined'&&typeof TABPAGES!=='undefined'&&!TABPAGES[view]){
+    navBack();return true;
+   }
+  }catch(e){}
+  return false;
+ };
+ var oldCopyText=copyText;
+ copyText=function(txt,okMsg){
+  try{window.AndroidMedia.copyText(String(txt==null?'':txt));popCheck(okMsg||'已复制到剪贴板');}
+  catch(e){oldCopyText.apply(this,arguments);}
+ };
  function requestNative(method,args){
   return new Promise(function(resolve){
    var id='am'+(++serial)+'_'+Date.now();
@@ -11936,14 +11951,16 @@ render();
  var oldPickFolder=pickFolder;
  pickFolder=function(kind){
   return requestNative('pickMediaFolder',[kind]).then(function(r){
+   if(r&&r.cancelled)return null;
    if(r&&Array.isArray(r.items))return nativeItems(r,kind);
-   /* Native picker was cancelled or unavailable: retain the browser fallback. */
+   /* Native bridge unavailable: retain the browser fallback. */
    return oldPickFolder(kind);
   });
  };
  var oldPickFiles=pickFiles;
  pickFiles=function(kind){
   return requestNative('pickMediaFiles',[kind]).then(function(r){
+   if(r&&r.cancelled)return null;
    if(r&&Array.isArray(r.items))return nativeItems(r,kind);
    return oldPickFiles(kind);
   });
@@ -11956,11 +11973,25 @@ render();
    var p=packOf(co);
    p.ch.forEach(function(c){
     var it=items.find(function(x){return x.rel===c.media.rel||(x.fname===c.media.fname&&x.size===c.media.size);});
-    if(it&&it.file&&it.file._nativeUri)c.media.nativeUri=it.file._nativeUri;
+    if(it&&it.file&&it.file._nativeUri){
+     c.media.nativeUri=it.file._nativeUri;
+     MEDIA[id+':'+c.id]={file:it.file,url:it.file._nativeUrl,nativeUri:it.file._nativeUri};
+    }
    });
    syncCourses();save();
   }
   return id;
+ };
+ var oldAddMediaItems=addMediaItems;
+ addMediaItems=function(co,items,dirHandle){
+  var out=oldAddMediaItems.apply(this,arguments);
+  if(co){packOf(co).ch.forEach(function(c){
+   var it=(items||[]).find(function(x){return x.rel===c.media.rel||(x.fname===c.media.fname&&x.size===c.media.size);});   if(it&&it.file&&it.file._nativeUri){
+    c.media.nativeUri=it.file._nativeUri;
+    MEDIA[co.id+':'+c.id]={file:it.file,url:it.file._nativeUrl,nativeUri:it.file._nativeUri};
+   }
+  });syncCourses();save();}
+  return out;
  };
  var oldAttachFiles=attachFiles;
  attachFiles=function(courseId,items){
@@ -11968,11 +11999,52 @@ render();
   if(co){
    packOf(co).ch.forEach(function(c){
     var it=items.find(function(x){return x.rel===c.media.rel||(x.fname===c.media.fname&&x.size===c.media.size);});
-    if(it&&it.file&&it.file._nativeUri)c.media.nativeUri=it.file._nativeUri;
+    if(it&&it.file&&it.file._nativeUri){
+     c.media.nativeUri=it.file._nativeUri;
+     MEDIA[courseId+':'+c.id]={file:it.file,url:it.file._nativeUrl,nativeUri:it.file._nativeUri};
+    }
    });
    syncCourses();save();
   }
   return n;
+ };
+ /* Android TextToSpeech fallback: do not depend on WebView's sometimes-missing speechSynthesis service. */
+ var nativeTtsReady=false,nativeTtsVoices=[],nativeTtsPending=Object.create(null),nativeTtsSerial=0;
+ window.__androidTtsVoices=[];
+ window.__nativeTtsEvent=function(id,event){
+  var c=nativeTtsPending[id];if(!c)return;
+  if(event==='start'){if(c.tok===TTS.tok)ttsMarkNow(c.item.el);return;}
+  delete nativeTtsPending[id];
+  if(c.tok!==TTS.tok)return;
+  if(event==='end')c.next();else c.fail('native-tts');
+ };
+ requestNative('getTtsVoices',[]).then(function(r){
+  if(r&&r.ready){nativeTtsReady=true;nativeTtsVoices=r.voices||[];window.__androidTtsVoices=nativeTtsVoices;}
+ });
+ var oldTtsSupported=ttsSupported;
+ ttsSupported=function(){return nativeTtsReady||oldTtsSupported();};
+ var oldSpeakSystem=speakSystem;
+ speakSystem=function(item,tok,next,fail){
+  if(!nativeTtsReady)return oldSpeakSystem.apply(this,arguments);
+  var id='tts'+(++nativeTtsSerial)+'_'+Date.now(),cfg=ttsCfg();
+  nativeTtsPending[id]={item:item,tok:tok,next:next,fail:fail};
+  try{window.AndroidMedia.speakTts(id,item.text,Number(cfg.rate)||1,cfg.voice||'');}
+  catch(e){delete nativeTtsPending[id];fail('native-tts');}
+ };
+ var oldHalt=ttsHaltAudio;
+ ttsHaltAudio=function(){try{window.AndroidMedia.stopTts();}catch(e){}return oldHalt.apply(this,arguments);};
+ var oldKeepNote=mediaKeepNote;
+ mediaKeepNote=function(items,cb){
+  var wrap=oldKeepNote.apply(this,arguments);
+  if(wrap&&window.AndroidMedia){
+   var note=wrap.querySelector('.ig-note');
+   if(note)note.textContent='Android 会保存系统文件访问授权；下次打开应用时会尝试自动重新连接，不需要把大视频复制到应用存储。';
+   var keepButton=wrap.querySelector('.mkeep');
+   if(keepButton){keepButton.disabled=true;keepButton.classList.add('on');}
+   var label=wrap.querySelector('.mkeep span');
+   if(label)label.textContent='系统文件访问授权（已启用）';
+  }
+  return wrap;
  };
  var oldPersist=window.mediaPersist;
  window.mediaPersist=async function(co,items,keep,dirHandle){
@@ -11986,7 +12058,8 @@ render();
    return;
   }
   if(oldPersist)return oldPersist.apply(this,arguments);
- }; var oldRelink=window.relinkMedia;
+ };
+ var oldRelink=window.relinkMedia;
  window.relinkMedia=async function(courseId,interactive,onlyCh){
   var ok=false;
   try{if(oldRelink)ok=await oldRelink.apply(this,arguments);}catch(e){}
@@ -11996,7 +12069,7 @@ render();
    var c=rows[i],key=courseId+':'+c.id;if(MEDIA[key])continue;
    try{
     var r=await requestNative('registerMediaUri',[c.media.nativeUri]);
-    if(r&&r.url){MEDIA[key]={file:null,url:r.url,nativeUri:c.media.nativeUri};ok=true;}
+    if(r&&r.url){MEDIA[key]={file:{_nativeUrl:r.url,_nativeUri:c.media.nativeUri,name:c.media.fname||c.t,size:c.media.size||0,lastModified:c.media.mtime||0},url:r.url,nativeUri:c.media.nativeUri};ok=true;}
    }catch(e){}
   }
   return ok;
@@ -12010,7 +12083,9 @@ render();
     create a Blob from a JavaScript placeholder object. */
  var oldRenderPlayer=renderPlayer;
  renderPlayer=function(){
-  oldRenderPlayer.apply(this,arguments);
+  var oldCreate=URL.createObjectURL;
+  URL.createObjectURL=function(obj){return obj&&obj._nativeUrl?obj._nativeUrl:oldCreate.call(URL,obj);};
+  try{oldRenderPlayer.apply(this,arguments);}finally{URL.createObjectURL=oldCreate;}
   var c=curChapter(),co=curCourse();if(!c||!co||!c.media)return;
   var reg=MEDIA[co.id+':'+c.id],el=document.querySelector('#v-player .media-el');
   if(reg&&reg.url&&el&&el.src!==reg.url)el.src=reg.url;
@@ -12035,6 +12110,7 @@ render();
  /* Video poster helpers accept either a File/Blob or a native streamed URL. */
  var oldFrameBlob=frameBlob;
  frameBlob=function(file,t){
+  if(file&&typeof file==='object'&&file._nativeUrl)file=file._nativeUrl;
   if(typeof file!=='string')return oldFrameBlob(file,t);
   return new Promise(function(res){
    var v=document.createElement('video'),done=false,tm=setTimeout(function(){fin(null);},12000);
@@ -12067,11 +12143,13 @@ render();
    var text=(withBom?'\uFEFF':'')+String(content==null?'':content);
    var b64=btoa(unescape(encodeURIComponent(text)));
    window.AndroidMedia.saveTextFile(name,mime,b64);
-   return true;
+   toast('已打开系统保存窗口，请选择保存位置');
+   return false;
   }catch(e){return oldSaveBlob?oldSaveBlob.apply(this,arguments):false;}
  };
 })();
 </script>
+
 
 </body>
 </html>
