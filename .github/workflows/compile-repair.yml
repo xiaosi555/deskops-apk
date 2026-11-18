@@ -47,3 +47,31 @@ jobs:
           gradle-version: '8.4'
       - name: Kotlin compile check only (no APK packaging)
         run: gradle --no-daemon :app:compileDebugKotlin
+
+      - name: Kotlin and resource integrity checks
+        run: |
+          python3 tools/ktcheck.py app/src/main/java
+          python3 - <<'PY'
+          import json
+          import pathlib
+          import xml.etree.ElementTree as ET
+          root = pathlib.Path(".")
+          json.loads((root / "app/src/main/assets/course_ops.json").read_text(encoding="utf-8"))
+          xmls = list((root / "app/src/main").rglob("*.xml"))
+          for path in xmls:
+              ET.parse(path)
+          manifest = ET.parse(root / "app/src/main/AndroidManifest.xml").getroot()
+          android = "{http://schemas.android.com/apk/res/android}"
+          app = manifest.find("application")
+          assert app is not None
+          assert app.attrib.get(android + "icon") == "@drawable/app_icon"
+          strings = ET.parse(root / "app/src/main/res/values/strings.xml").getroot()
+          app_name = next((x.text for x in strings.findall("string") if x.attrib.get("name") == "app_name"), None)
+          assert app_name == "桌面课程", app_name
+          icon = root / "app/src/main/res/drawable-nodpi/app_icon.webp"
+          assert icon.is_file() and icon.stat().st_size > 0
+          print(f"Resource integrity OK: {len(xmls)} XML files, course JSON valid, WebP icon present.")
+          PY
+          git diff --check
+      - name: Android Lint (no APK packaging)
+        run: gradle --no-daemon :app:lintDebug
