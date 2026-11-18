@@ -17,6 +17,8 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.net.Uri
+import androidx.activity.OnBackPressedCallback
+import android.view.animation.PathInterpolator
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -235,6 +237,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         })
 
         setContentView(root)
+        installSystemBackHandler()
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             topPad = if (app.store.topInset) bars.top else 0
@@ -263,7 +266,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     private fun layoutStage() {
         val onTab = tabs.containsKey(view)
         val lp = stage.layoutParams as FrameLayout.LayoutParams
-        lp.topMargin = if (onTab) 0 else topPad + dp(52f)
+        lp.topMargin = if (onTab) 0 else topPad + dp(56f)
         lp.bottomMargin = dp(58f) + bottomPad
         stage.layoutParams = lp
     }
@@ -392,6 +395,19 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
             selectionBar.close()
             stage.removeAllViews()
             stage.addView(sv, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            // 对齐 HTML 的 pageIn：页面淡入并从下方轻移入场（380ms / --snap）
+            if (!Tokens.reducedMotion) {
+                sv.alpha = 0f
+                sv.translationY = dp(14f).toFloat()
+                sv.animate().cancel()
+                sv.animate().alpha(1f).translationY(0f)
+                    .setDuration(380L)
+                    .setInterpolator(PathInterpolator(0.22f, 0.74f, 0.18f, 1f))
+                    .start()
+            } else {
+                sv.alpha = 1f
+                sv.translationY = 0f
+            }
         }
         layoutStage()
         appbar.visibility = if (onTab) View.GONE else View.VISIBLE
@@ -503,8 +519,25 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         app.retheme()
     }
 
-    override fun onBackPressed() {
-        if (selectionBar.isOpen() || view != "mine" || navStack.isNotEmpty()) goBack() else super.onBackPressed()
+    /**
+     * Android 系统返回键统一走应用路由栈：
+     * 先处理划线浮层 / 嵌套详情，再逐级返回上一个页面；
+     * 只有停留在「课程」根页且无历史页面时才退出 Activity。
+     * Dialog / BottomSheet 自身会先接收系统返回并关闭，不会跳过当前浮层。
+     */
+    private fun installSystemBackHandler() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (selectionBar.isOpen() || view != "mine" || navStack.isNotEmpty()) {
+                    goBack()
+                    return
+                }
+                // 根页面没有可返回的菜单，交还给系统执行退出。
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+                isEnabled = true
+            }
+        })
     }
 
     override fun onDestroy() {
