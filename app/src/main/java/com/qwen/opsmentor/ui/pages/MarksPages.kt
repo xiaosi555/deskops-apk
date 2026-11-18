@@ -206,6 +206,8 @@ private fun check(ctx: Activity, on: Boolean, onChange: (Boolean) -> Unit): Fram
 class PageMarksCourse(act: Activity, app: App) : Page(act, app) {
 
     override val key = "anno"
+    // HTML STUDY_VIEWS 包含 anno：在本课程划线页阅读和整理也计入学习时间。
+    override val learning = true
     override fun title() = "我的划线"
 
     private var fTy = ""
