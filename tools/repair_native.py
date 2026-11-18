@@ -400,3 +400,20 @@ rep("ui/MiniBar.kt", [
     ("        val ctx = context\\n        val ctx = context\\n", "        val ctx = context\\n")
 ])
 print("Final cleanup complete.")
+
+
+# Idempotence guard for helper injections: collapse adjacent duplicate locals on reruns.
+def final_idempotence_cleanup(s):
+    lines=s.splitlines()
+    out=[]
+    for line in lines:
+        if line.strip() in ("val ctx = context", "val r = reader ?: return") and out and out[-1].strip()==line.strip():
+            continue
+        out.append(line)
+    return "\n".join(out)+"\n"
+edit("ui/MiniBar.kt", final_idempotence_cleanup)
+def reader_cleanup(s):
+    s=re.sub(r"(?:reader)+\\.", "r.", s)
+    return final_idempotence_cleanup(s)
+edit("ui/MainActivity.kt", reader_cleanup)
+print("Idempotence cleanup complete.")
