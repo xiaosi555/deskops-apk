@@ -1,1 +1,0 @@
-One-time build trigger. The workflow is restored to manual-only immediately after dispatch.
