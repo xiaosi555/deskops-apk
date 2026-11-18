@@ -214,6 +214,19 @@ object MediaCourses {
 
     fun dir(ctx: Context, courseId: String): File = File(ctx.filesDir, "media/$courseId").apply { mkdirs() }
 
+    /** 删除课程时只清理本应用私有副本，不触碰用户原始 SAF 文件。 */
+    fun deleteLocal(ctx: Context, store: Store, courseId: String) {
+        runCatching {
+            val root = File(ctx.filesDir, "media").canonicalFile
+            val target = File(root, courseId).canonicalFile
+            if (target.parentFile == root && target.exists()) target.deleteRecursively()
+        }
+        store.mediaTrees.remove(courseId)
+        val prefix = "$courseId:"
+        store.mediaPos.keys.filter { it.startsWith(prefix) }.toList().forEach { store.mediaPos.remove(it) }
+        store.save()
+    }
+
     /** 播放地址：优先应用内副本，其次原始 uri */
     fun resolve(ctx: Context, courseId: String, ch: Chapter): String {
         val m = ch.media ?: return ""
