@@ -109,6 +109,8 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
     var page by remember { mutableStateOf("root") }
     var selectedMedia by remember { mutableStateOf<DeskMedia?>(null) }
     var selectedCourse by remember { mutableStateOf<Course?>(null) }
+    var activeCourseId by remember { mutableLongStateOf(0L) }
+    var activeChapterId by remember { mutableLongStateOf(0L) }
     var showAddCourse by remember { mutableStateOf(false) }
     var showChapterEditor by remember { mutableStateOf(false) }
     var editingChapter by remember { mutableStateOf<Chapter?>(null) }
@@ -230,7 +232,16 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
             }
         ) { padding ->
             when {
-                page == "player" && selectedMedia != null -> NativePlayer(selectedMedia!!, Modifier.padding(padding), fg, sub, primary)
+                page == "player" && selectedMedia != null -> NativePlayer(
+                    selectedMedia!!, Modifier.padding(padding), fg, sub, primary,
+                    onSession = { duration ->
+                        if (duration >= 5000L) {
+                            val day = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(java.util.Date())
+                            sessions.add(StudySession(System.currentTimeMillis(), activeCourseId, activeChapterId, duration, day))
+                            prefs.edit().putString("sessions", LearningDataCodec.encodeSessions(sessions)).apply()
+                        }
+                    }
+                )
                 page == "course" && selectedCourse != null -> CourseDetail(
                     selectedCourse!!, Modifier.padding(padding), fg, sub, surface, primary, speak,
                     onAddChapter = { editingChapter = null; chapterTitle = ""; chapterContent = ""; chapterMediaUri = ""; showChapterEditor = true },
@@ -241,12 +252,22 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                         persistCourse(selectedCourse!!.copy(chapters = items.size, chapterItems = items, progress = if (items.isEmpty()) 0 else done * 100 / items.size))
                     },
                     onDeleteChapter = { ch -> persistCourse(selectedCourse!!.copy(chapters = (selectedCourse!!.chapterItems.size - 1).coerceAtLeast(0), chapterItems = selectedCourse!!.chapterItems.filterNot { it.id == ch.id })) },
-                    onPlayMedia = { uri -> media.firstOrNull { it.uri == uri }?.let { selectedMedia = it; page = "player" } }
+                    onPlayMedia = { uri, chapterId -> media.firstOrNull { it.uri == uri }?.let {
+                        selectedMedia = it; activeCourseId = selectedCourse!!.id; activeChapterId = chapterId; page = "player"
+                    } },
+                    onSaveHighlight = { ch ->
+                        if (ch.content.isNotBlank()) {
+                            highlights.add(Highlight(System.currentTimeMillis(), selectedCourse!!.id, ch.id, ch.content))
+                            prefs.edit().putString("highlights", LearningDataCodec.encodeHighlights(highlights)).apply()
+                            Toast.makeText(context, "已保存本章摘录", Toast.LENGTH_SHORT).show()
+                        } else Toast.makeText(context, "本章暂无正文可保存", Toast.LENGTH_SHORT).show()
+                    },
+                    highlights = highlights.filter { it.courseId == selectedCourse!!.id }
                 )
                 page == "root" -> when(tab) {
                     "学习" -> LearningHome(courses, media, Modifier.padding(padding), fg, sub, surface, primary) { c -> selectedCourse = c; page = "course" }
                     "课程" -> CourseList(courses, Modifier.padding(padding), fg, sub, surface, primary, onOpen = { selectedCourse = it; page = "course" }, onAdd = { showAddCourse = true })
-                    "媒体" -> MediaLibrary(media, Modifier.padding(padding), fg, sub, surface, primary, onPlay = { selectedMedia = it; page = "player" }, onImportFiles = { mediaPicker.launch(arrayOf("video/*", "audio/*")) }, onImportFolder = { folderPicker.launch(null) }, onRemove = { item -> media.remove(item); prefs.edit().putString("media", writeMedia(media)).apply() })
+                    "媒体" -> MediaLibrary(media, Modifier.padding(padding), fg, sub, surface, primary, onPlay = { activeCourseId = 0L; activeChapterId = 0L; selectedMedia = it; page = "player" }, onImportFiles = { mediaPicker.launch(arrayOf("video/*", "audio/*")) }, onImportFolder = { folderPicker.launch(null) }, onRemove = { item -> media.remove(item); prefs.edit().putString("media", writeMedia(media)).apply() })
                     else -> SettingsScreen(themeChoice, darkMode, Modifier.padding(padding), fg, sub, surface, primary,
                         onTheme = { themeChoice = it; prefs.edit().putInt("theme", it).apply() },
                         onDark = { darkMode = it; prefs.edit().putBoolean("dark", it).apply() },
@@ -373,7 +394,8 @@ private fun CourseCard(course: Course, surface: Color, fg: Color, sub: Color, pr
 private fun CourseDetail(
     course: Course, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color,
     speak: (String) -> Unit, onAddChapter: () -> Unit, onEditChapter: (Chapter) -> Unit,
-    onToggleChapter: (Chapter) -> Unit, onDeleteChapter: (Chapter) -> Unit, onPlayMedia: (String) -> Unit
+    onToggleChapter: (Chapter) -> Unit, onDeleteChapter: (Chapter) -> Unit, onPlayMedia: (String, Long) -> Unit,
+    onSaveHighlight: (Chapter) -> Unit, highlights: List<Highlight>
 ) {
     var expandedChapter by remember { mutableStateOf<Long?>(null) }
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -417,7 +439,8 @@ private fun CourseDetail(
                         Text(chapter.content, color = fg, lineHeight = 23.sp, modifier = Modifier.padding(start = 12.dp, top = 8.dp))
                         TextButton(onClick = { speak(chapter.content) }) { Icon(Icons.Rounded.VolumeUp, null); Text("朗读本章") }
                     } else Text("本章还没有正文内容", color = sub, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp))
-                    if (chapter.mediaUri.isNotBlank()) OutlinedButton(onClick = { onPlayMedia(chapter.mediaUri) }, modifier = Modifier.fillMaxWidth()) {
+                    if (chapter.content.isNotBlank()) OutlinedButton(onClick = { onSaveHighlight(chapter) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Rounded.BookmarkAdd, null); Spacer(Modifier.width(6.dp)); Text("收藏本章为摘录") }
+                    if (chapter.mediaUri.isNotBlank()) OutlinedButton(onClick = { onPlayMedia(chapter.mediaUri, chapter.id) }, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Rounded.PlayCircle, null); Spacer(Modifier.width(6.dp)); Text("播放关联媒体")
                     }
                 }
@@ -464,8 +487,9 @@ private fun MediaLibrary(media: List<DeskMedia>, modifier: Modifier, fg: Color, 
 }
 
 @Composable
-private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: Color, primary: Color) {
+private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: Color, primary: Color, onSession: (Long) -> Unit) {
     val context = LocalContext.current
+    val startedAt = remember(media.uri) { android.os.SystemClock.elapsedRealtime() }
     val player = remember(media.uri) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(ExoMediaItem.fromUri(Uri.parse(media.uri)))
@@ -473,7 +497,7 @@ private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: C
             playWhenReady = true
         }
     }
-    DisposableEffect(player) { onDispose { player.release() } }
+    DisposableEffect(player) { onDispose { onSession((android.os.SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L)); player.release() } }
     Column(modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, update = { it.player = player }, modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f))
         Column(Modifier.fillMaxWidth().background(Color(0xFF171923)).padding(18.dp)) {
