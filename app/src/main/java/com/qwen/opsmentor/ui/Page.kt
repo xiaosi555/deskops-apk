@@ -17,6 +17,7 @@ import com.qwen.opsmentor.core.label
 import com.qwen.opsmentor.core.surface
 import com.qwen.opsmentor.core.flat
 import com.qwen.opsmentor.core.itemIn
+import com.qwen.opsmentor.core.installHtmlPressFeedbackRecursively
 import com.qwen.opsmentor.data.Chapter
 import com.qwen.opsmentor.data.Pack
 import com.qwen.opsmentor.state.Mark
@@ -91,6 +92,8 @@ abstract class Page(val act: Activity, val app: App) {
         box.removeAllViews()
         blocks.clear()
         body(box)
+        // HTML 按压反馈：递归为可点击行 / 卡片补上主色水波，不改写原点击回调。
+        box.installHtmlPressFeedbackRecursively()
         // HTML .stagger：页面进入时，一级内容按 30ms 起步错峰浮现。
         if (animateItems && !Tokens.reducedMotion) {
             for (index in 0 until box.childCount) {
