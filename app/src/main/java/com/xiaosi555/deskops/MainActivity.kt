@@ -60,13 +60,23 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         tts = TextToSpeech(this) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
-            if (ttsReady) tts?.language = Locale.SIMPLIFIED_CHINESE
+            if (ttsReady) {
+                val result = tts?.setLanguage(Locale.SIMPLIFIED_CHINESE)
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    runOnUiThread { Toast.makeText(this, "当前语音引擎缺少中文语音数据，请在朗读设置中安装语音数据", Toast.LENGTH_LONG).show() }
+                }
+            }
         }
         window.statusBarColor = android.graphics.Color.rgb(247, 248, 252)
         window.navigationBarColor = android.graphics.Color.rgb(247, 248, 252)
         window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-        setContent { DeskOpsApp(::speakText, ::availableTtsVoices) }
+        setContent { DeskOpsApp(::speakText, ::availableTtsVoices, ::openTtsSettings) }
         Log.i("DeskOpsNativeSmoke", "NATIVE_APP_READY")
+    }
+
+    private fun openTtsSettings() {
+        runCatching { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
+            .onFailure { runCatching { startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)) } }
     }
 
     private fun speakText(text: String) {
@@ -98,7 +108,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<String, String>>) {
+private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<String, String>>, openTtsSettings: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("deskops_native", 0) }
     val media = remember { mutableStateListOf<DeskMedia>().apply { addAll(readMedia(prefs.getString("media", "[]") ?: "[]")) } }
@@ -309,7 +319,7 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                         onDark = { darkMode = it; prefs.edit().putBoolean("dark", it).apply() },
                         onExport = { exportBackupLauncher.launch("deskops-learning-backup.json") },
                         onImport = { importBackupLauncher.launch(arrayOf("application/json", "text/*")) },
-                        ttsRate = ttsRate, ttsPitch = ttsPitch, ttsVoice = ttsVoice, getTtsVoices = getTtsVoices,
+                        ttsRate = ttsRate, ttsPitch = ttsPitch, ttsVoice = ttsVoice, getTtsVoices = getTtsVoices, openTtsSettings = openTtsSettings,
                         onTtsRate = { ttsRate = it; prefs.edit().putFloat("tts_rate", it).apply() },
                         onTtsPitch = { ttsPitch = it; prefs.edit().putFloat("tts_pitch", it).apply() },
                         onTtsVoice = { ttsVoice = it; prefs.edit().putString("tts_voice", it).apply() })
@@ -640,7 +650,7 @@ private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: C
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, onTheme: (Int) -> Unit, onDark: (Boolean) -> Unit, onExport: () -> Unit, onImport: () -> Unit, ttsRate: Float, ttsPitch: Float, ttsVoice: String, getTtsVoices: () -> List<Pair<String, String>>, onTtsRate: (Float) -> Unit, onTtsPitch: (Float) -> Unit, onTtsVoice: (String) -> Unit) {
+private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, onTheme: (Int) -> Unit, onDark: (Boolean) -> Unit, onExport: () -> Unit, onImport: () -> Unit, ttsRate: Float, ttsPitch: Float, ttsVoice: String, getTtsVoices: () -> List<Pair<String, String>>, openTtsSettings: () -> Unit, onTtsRate: (Float) -> Unit, onTtsPitch: (Float) -> Unit, onTtsVoice: (String) -> Unit) {
     val colors = listOf(Color(0xFF6757D9), Color(0xFF2878D0), Color(0xFF168C76), Color(0xFFE18A35))
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Text("个性化", color = fg, fontSize = 23.sp, fontWeight = FontWeight.Bold) }
@@ -682,6 +692,9 @@ private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Co
                 }
                 OutlinedButton(onClick = { voices = getTtsVoices() }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Rounded.Refresh, null); Spacer(Modifier.width(6.dp)); Text("重新读取手机已安装音色")
+                }
+                OutlinedButton(onClick = openTtsSettings, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Rounded.SettingsVoice, null); Spacer(Modifier.width(6.dp)); Text("打开系统语音设置 / 安装语音数据")
                 }
                 if (voices.isEmpty()) Text("暂未读取到音色。请先在手机系统设置中安装或启用语音服务，再点击刷新。", color = sub, fontSize = 12.sp)
             }
