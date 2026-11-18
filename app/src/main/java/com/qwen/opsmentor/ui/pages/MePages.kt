@@ -509,12 +509,7 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
     private fun daysBetween(a: Date, b: Date): Int =
         Math.round((b.time - a.time) / 86400000.0).toInt().coerceAtLeast(0)
 
-    private fun minutesOf(day: String): Int = maxOf(store.studyLog[day] ?: 0, autoMinutes(day))
-
-    /** 自动累计的分钟数（与人工校正值合并取较大者） */
-    private fun autoMinutes(day: String): Int = store.bags.values.sumOf { bag ->
-        bag.learn.values.count { it.at == day } * 12
-    }
+    private fun minutesOf(day: String): Int = store.studyLog[day] ?: 0
 
     private fun learnedOn(day: String): List<String> =
         store.bags[store.cur]?.learn?.filterValues { it.at == day }?.keys?.toList() ?: emptyList()
