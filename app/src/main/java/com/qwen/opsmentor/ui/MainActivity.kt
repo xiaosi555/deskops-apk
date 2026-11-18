@@ -307,7 +307,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         val lp = stage.layoutParams as FrameLayout.LayoutParams
         lp.width = contentWidth()
         lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-        lp.topMargin = if (onTab) 0 else topPad + dp(56f)
+        // HTML：无顶栏的 Tab 页面仍需避开状态栏；子页面在安全区之后再预留 56dp 顶栏。
+        lp.topMargin = topPad + if (onTab) 0 else dp(56f)
         lp.bottomMargin = dp(60f) + bottomPad
         stage.layoutParams = lp
     }
