@@ -116,10 +116,10 @@ class SelectionBar(private val act: Activity, private val app: App) {
 
         row.addView(dragHandle(ctx, bar))
         row.addView(tiny(ctx, "起−") { shift("s", -1) })
-        bar.addView(tiny(ctx, "起+") { shift("s", 1) })
-        bar.addView(tiny(ctx, "终−") { shift("e", -1) })
-        bar.addView(tiny(ctx, "终+") { shift("e", 1) })
-        bar.addView(tiny(ctx, "整段") {
+        row.addView(tiny(ctx, "起+") { shift("s", 1) })
+        row.addView(tiny(ctx, "终−") { shift("e", -1) })
+        row.addView(tiny(ctx, "终+") { shift("e", 1) })
+        row.addView(tiny(ctx, "整段") {
             val v = target ?: return@tiny
             val r = v.blockRange()
             if (r.last > r.first) { start = r.first; end = r.last; v.setSelection(start, end) }
@@ -141,7 +141,7 @@ class SelectionBar(private val act: Activity, private val app: App) {
             row.addView(box)
             tyViews.add(t.id to box)
         }
-        bar.addView(divider(ctx))
+        row.addView(divider(ctx))
         MarkColor.values().forEach { c ->
             val box = FrameLayout(ctx).apply {
                 flat(Tokens.withAlpha(Tokens.ink, 0.05f), 7f)
@@ -154,12 +154,12 @@ class SelectionBar(private val act: Activity, private val app: App) {
             box.addView(View(ctx).apply { circle(Color.parseColor(c.hex)) },
                 FrameLayout.LayoutParams(ctx.dp(17f), ctx.dp(17f)).also { it.gravity = Gravity.CENTER })
             box.setOnClickListener { curCo = c.id; paintSwatches(); box.animatePop() }
-            bar.addView(box)
+            row.addView(box)
             coViews.add(c.id to box)
         }
-        bar.addView(divider(ctx))
-        bar.addView(tiny(ctx, "划线", strong = true) { commit() })
-        bar.addView(tiny(ctx, "取消") { close() })
+        row.addView(divider(ctx))
+        row.addView(tiny(ctx, "划线", strong = true) { commit() })
+        row.addView(tiny(ctx, "取消") { close() })
 
         val availableWidth = (root.width.takeIf { it > 0 } ?: ctx.resources.displayMetrics.widthPixels) - ctx.dp(12f)
         val lp = FrameLayout.LayoutParams(min(ctx.dp(540f), availableWidth.coerceAtLeast(ctx.dp(180f))), ctx.dp(44f))
