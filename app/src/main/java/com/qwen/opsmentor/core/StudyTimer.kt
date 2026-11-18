@@ -35,10 +35,11 @@ class StudyTimer {
         if (!learning) flush()
         handler.removeCallbacks(ticker)
         val sameLearningPage = learning && pageKey == key
+        val wasActive = active
         pageKey = if (learning) key else ""
         active = learning
         val now = System.currentTimeMillis()
-        lastTick = now
+        if (!sameLearningPage || !wasActive) lastTick = now
         // 同一页面的重绘 / 从后台恢复不等于用户活动；只有首次进入或切换学习页才刷新空闲计时。
         if (!learning) lastActivityAt = 0L
         else if (!sameLearningPage) lastActivityAt = now
