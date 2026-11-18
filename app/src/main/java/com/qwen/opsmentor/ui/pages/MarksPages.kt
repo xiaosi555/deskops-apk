@@ -147,7 +147,7 @@ class PageMarks(act: Activity, app: App) : Page(act, app) {
         val wrap = hrow(ctx)
         wrap.gravity = Gravity.TOP
         wrap.addView(View(ctx).apply { flat(Color.parseColor(MarkColor.of(m.co).hex), 2f) }, LinearLayout.LayoutParams(ctx.dp(3f), 0))
-        (wrap.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = ctx.dp(8f)
+        wrap.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) }
         wrap.addView(q, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(8f) })
         card.addView(wrap)
         if (m.tags.isNotEmpty()) {

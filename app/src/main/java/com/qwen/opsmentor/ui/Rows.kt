@@ -32,6 +32,7 @@ import com.qwen.opsmentor.data.Chapter
 import com.qwen.opsmentor.data.Pack
 import com.qwen.opsmentor.state.Courses
 
+import com.qwen.opsmentor.core.add
 /**
  * 行组件：播客条目行（星球版）与卡片行（极简版）。
  * 与 Web 的 epChapter / epCourse / chRow / listRow 一一对应。
@@ -72,8 +73,8 @@ object Rows {
             FrameLayout.LayoutParams(ctx.dp(52f), ctx.dp(52f)))
         el.addView(th)
         val mn = vcol(ctx)
-        mn.addView(label(ctx, c.id + " " + c.t, 16.5f, if (isCur) Tokens.pri else Tokens.ink, Tokens.weightH(), 2), t = 2)
-        if (c.s.isNotEmpty()) mn.addView(muted(ctx, c.s, 13f, 2), t = 3)
+        mn.add(label(ctx, c.id + " " + c.t, 16.5f, if (isCur) Tokens.pri else Tokens.ink, Tokens.weightH(), 2), t = 2)
+        if (c.s.isNotEmpty()) mn.add(muted(ctx, c.s, 13f, 2), t = 3)
         val meta = hrow(ctx)
         meta.setPadding(0, ctx.dp(6f), 0, 0)
         val label2 = when (st) {
@@ -144,7 +145,7 @@ object Rows {
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         val ci = vcol(ctx)
         ci.addView(label(ctx, c.t, 15f, Tokens.ink, Tokens.weightM()))
-        if (c.s.isNotEmpty()) ci.addView(muted(ctx, c.s, 12.5f, 2), t = 2)
+        if (c.s.isNotEmpty()) ci.add(muted(ctx, c.s, 12.5f, 2), t = 2)
         el.addView(ci, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(10f) })
         if (st != null) el.addView(label(ctx, when (st) { "green" -> "🟢"; "yellow" -> "🟡"; else -> "" }, 13f, Tokens.sub),
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.marginEnd = ctx.dp(6f) })
@@ -182,7 +183,7 @@ object Rows {
         }
         k.addView(sb, LinearLayout.LayoutParams(ctx.dp(24f), ctx.dp(24f)))
         mn.addView(k)
-        mn.addView(label(ctx, meta.first, 16.5f, Tokens.ink, Tokens.weightH(), 2), t = 2)
+        mn.add(label(ctx, meta.first, 16.5f, Tokens.ink, Tokens.weightH(), 2), t = 2)
         if (meta.second.isNotEmpty()) {
             val q = hrow(ctx)
             q.addView(iconView(ctx, "quote", Tokens.sub, 15f))
@@ -232,12 +233,12 @@ object Rows {
             LinearLayout.LayoutParams(ctx.dp(76f), ctx.dp(76f)))
         val ci = vcol(ctx)
         ci.addView(label(ctx, meta.first, 16f, Tokens.ink, Tokens.weightH()))
-        ci.addView(muted(ctx, meta.second, 12.5f, 2), t = 4)
+        ci.add(muted(ctx, meta.second, 12.5f, 2), t = 4)
         if (prog.started) {
             val bar = com.qwen.opsmentor.ui.Bars.bar(ctx, prog.pct() / 100f)
             ci.addView(bar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(6f)).also { it.topMargin = ctx.dp(8f) })
         }
-        ci.addView(label(ctx, (if (prog.started) "已过关 ${prog.done} / ${prog.total} 章 · " else "") + "${prog.mods} 模块 · ${prog.chs} 章", 11.5f, Tokens.sub), t = 6)
+        ci.add(label(ctx, (if (prog.started) "已过关 ${prog.done} / ${prog.total} 章 · " else "") + "${prog.mods} 模块 · ${prog.chs} 章", 11.5f, Tokens.sub), t = 6)
         el.addView(ci, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(13f) })
         el.addView(iconBtn(ctx, if (starred) "starFill" else "star", "星标", 28f, if (starred) Tokens.pri else Tokens.sub) {
             val s = app.store.star
@@ -264,7 +265,7 @@ object Rows {
             el.addView(th)
             val mn = vcol(ctx)
             mn.addView(label(ctx, title, 15.5f, Tokens.ink, Tokens.weightM()))
-            if (desc.isNotEmpty()) mn.addView(muted(ctx, desc, 12.5f, 2), t = 3)
+            if (desc.isNotEmpty()) mn.add(muted(ctx, desc, 12.5f, 2), t = 3)
             el.addView(mn, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(13f) })
             if (tail.isNotEmpty()) el.addView(label(ctx, tail, 12.5f, Tokens.sub))
             el.addView(iconView(ctx, "chev", Tokens.sub, 18f), LinearLayout.LayoutParams(ctx.dp(18f), ctx.dp(18f)).also { it.marginStart = ctx.dp(6f) })
@@ -284,7 +285,7 @@ object Rows {
         el.addView(cid)
         val ci = vcol(ctx)
         ci.addView(label(ctx, title, 15f, Tokens.ink, Tokens.weightM()))
-        if (desc.isNotEmpty()) ci.addView(muted(ctx, desc, 12.5f, 2), t = 2)
+        if (desc.isNotEmpty()) ci.add(muted(ctx, desc, 12.5f, 2), t = 2)
         el.addView(ci, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(10f) })
         if (tail.isNotEmpty()) el.addView(label(ctx, tail, 12.5f, Tokens.sub), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.marginEnd = ctx.dp(6f) })
         el.addView(iconView(ctx, "chev", Tokens.sub, 18f))
@@ -322,17 +323,17 @@ object Bars {
             val r = hrow(ctx)
             row.forEach { (v, k) ->
                 val cell = vcol(ctx)
-                cell.flat(if (Tokens.planet) Tokens.l2 else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(Tokens.rInner()))
+                cell.flat(if (Tokens.planet) Tokens.l2 else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(Tokens.rInner()).toFloat())
                 val p = ctx.dp(10f)
                 cell.setPadding(p, p, p, p)
                 cell.addView(label(ctx, v, 19f, Tokens.ink, Tokens.weightH()))
-                cell.addView(muted(ctx, k, 11.5f, 2), t = 2)
+                cell.add(muted(ctx, k, 11.5f, 2), t = 2)
                 r.addView(cell, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also {
                     if (r.childCount > 0) it.marginStart = ctx.dp(8f)
                 })
                 val num = cell.getChildAt(0) as android.widget.TextView
                 val n = Regex("^(\\d+)").find(v)?.groupValues?.get(1)?.toIntOrNull()
-                if (n != null) num.countUp(n, v.substring(Regex("^(\\d+)").match(v)!!.value.length))
+                if (n != null) num.countUp(n, v.substring(Regex("^(\\d+)").find(v)!!.value.length))
             }
             grid.addView(r, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.bottomMargin = ctx.dp(8f) })
         }

@@ -1,4 +1,5 @@
 package com.qwen.opsmentor.ui.pages
+import com.qwen.opsmentor.core.groupTitle
 
 import android.app.Activity
 import android.view.Gravity
@@ -7,7 +8,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.qwen.opsmentor.App
-import com.qwen.opsmentor.core.Bars
+import com.qwen.opsmentor.ui.Bars
 import com.qwen.opsmentor.core.Icons
 import com.qwen.opsmentor.core.Sheets
 import com.qwen.opsmentor.core.Tokens
@@ -59,7 +60,7 @@ class PageProfile(act: Activity, app: App) : Page(act, app) {
         nmRow.addView(label(ctx, name, 30f, Tokens.ink, Tokens.weightH(), 1))
         nmRow.addView(iconView(ctx, "pen", Tokens.sub, 18f), LinearLayout.LayoutParams(ctx.dp(18f), ctx.dp(18f)).also { it.marginStart = ctx.dp(6f) })
         pi.addView(nmRow)
-        pi.addView(muted(ctx, bio, 13f, 2), t = 6)
+        pi.add(muted(ctx, bio, 13f, 2), t = 6)
         card.addView(pi, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(16f) })
         val edit = label(ctx, "编辑  ›", 13f, Tokens.sub)
         edit.setOnClickListener { ProfileEditor.open(act, app) }
@@ -123,7 +124,7 @@ class PageProfile(act: Activity, app: App) : Page(act, app) {
             }
             box.addView(iv, FrameLayout.LayoutParams(ctx.dp(66f), ctx.dp(66f)))
         } else {
-            val c = View(ctx)
+            val c = FrameLayout(ctx)
             c.flat(if (Tokens.planet) Tokens.priSoft else Tokens.pri, 33f)
             c.addView(label(ctx, name.substring(0, 1), 26f, if (Tokens.planet) Tokens.pri else Tokens.onPri, Tokens.weightH()),
                 FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.gravity = Gravity.CENTER })
@@ -136,10 +137,9 @@ class PageProfile(act: Activity, app: App) : Page(act, app) {
         val body = vcol(act, padH = 16)
         body.addView(label(act, "本应用是纯本地应用：进度、划线、案例库、术语手册与个人信息保存在本机，不联网、不上传、无账号体系。", 14f, Tokens.ink))
         body.addView(muted(act, "更换设备或清理数据前，请先在「数据」页导出一份完整档案。"), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(10f) })
-        body.addView(label(act, "查看完整数据说明与导入导出入口 ›", 13.5f, Tokens.pri, Tokens.weightM()),
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(12f) }).also {
-            it.setOnClickListener { nav("io") }
-        }
+        val link = label(act, "查看完整数据说明与导入导出入口 ›", 13.5f, Tokens.pri, Tokens.weightM())
+        link.setOnClickListener { nav("io") }
+        body.addView(link, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(12f) })
         Sheets.sheet(act, "数据说明", body, null)
     }
 }

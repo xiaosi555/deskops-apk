@@ -4,6 +4,7 @@ import android.app.Activity
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.core.widget.NestedScrollView
 import com.qwen.opsmentor.App
@@ -194,7 +195,7 @@ abstract class Page(val act: Activity, val app: App) {
         val c = act
         val card = card(host, 16f, 12)
         val hd = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        val box = View(c).apply {
+        val box = FrameLayout(c).apply {
             flat(Tokens.priSoft, c.dp(8f).toFloat())
             layoutParams = LinearLayout.LayoutParams(c.dp(30f), c.dp(30f))
         }
@@ -203,7 +204,7 @@ abstract class Page(val act: Activity, val app: App) {
         hd.addView(label(c, head, 17f, Tokens.ink, Tokens.weightH()), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = c.dp(10f) })
         card.addView(hd)
         if (intro.isNotEmpty()) card.addView(label(c, intro, 13f, Tokens.sub).also {
-            (it.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = c.dp(8f)
+            it.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { lp -> lp.topMargin = c.dp(8f) }
         })
         return card
     }

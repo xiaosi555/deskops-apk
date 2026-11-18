@@ -16,10 +16,13 @@ import com.qwen.opsmentor.core.RingButton
 import com.qwen.opsmentor.core.SNAP
 import com.qwen.opsmentor.core.Tokens
 import com.qwen.opsmentor.core.dp
+import com.qwen.opsmentor.core.circle
+import com.qwen.opsmentor.core.flat
 import com.qwen.opsmentor.core.label
 import com.qwen.opsmentor.core.surface
 import com.qwen.opsmentor.state.Courses
 
+import com.qwen.opsmentor.core.add
 /**
  * 迷你「继续学习」条（对应 Web renderMini / bindMini）：
  * - 章节页、（极简版）课程详情页不显示；
@@ -75,6 +78,7 @@ class MiniBar(ctx: Context, private val app: App, private val go: (String) -> Un
     }
 
     fun render(view: String) {
+        val ctx = context
         val planet = Tokens.planet
         val b = app.store.bag()
         val pinned = if (b.pin.isNotEmpty()) pack().chById(b.pin) else null
@@ -97,7 +101,7 @@ class MiniBar(ctx: Context, private val app: App, private val go: (String) -> Un
             LinearLayout.LayoutParams(ctx.dp(52f), ctx.dp(52f)))
         val mi = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
         mi.addView(label(ctx, ch.id + " " + ch.t, 13f, Tokens.ink, Tokens.weightM(), 1))
-        mi.addView(label(ctx, if (planet) "第 ${i + 1} / ${q.size} 站 · 已过关 ${pr.done}/${pr.total}"
+        mi.add(label(ctx, if (planet) "第 ${i + 1} / ${q.size} 站 · 已过关 ${pr.done}/${pr.total}"
         else "第 ${i + 1} / ${q.size} 站 · ${p.routeName(b.route)}", 11f, Tokens.sub, 400, 1), t = 2)
         inner.addView(mi, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also {
             it.marginStart = ctx.dp(11f); it.marginEnd = ctx.dp(8f)

@@ -1,4 +1,5 @@
 package com.qwen.opsmentor.io
+import com.qwen.opsmentor.data.toJson
 
 import com.qwen.opsmentor.data.Chapter
 import com.qwen.opsmentor.data.Cmd
@@ -371,3 +372,6 @@ object Importer {
         }
     }
 }
+
+private fun org.json.JSONArray.joinToString(separator: String): String =
+    (0 until length()).joinToString(separator) { optString(it) }

@@ -1,4 +1,10 @@
 package com.qwen.opsmentor.ui
+import com.qwen.opsmentor.core.surface
+import android.graphics.Rect
+import android.graphics.Canvas
+import android.graphics.Bitmap
+import java.io.FileOutputStream
+import java.io.File
 
 import android.content.res.Configuration
 import android.graphics.Color
@@ -32,6 +38,7 @@ import com.qwen.opsmentor.state.Bus
 import com.qwen.opsmentor.state.Courses
 import com.qwen.opsmentor.ui.pages.*
 
+import com.qwen.opsmentor.core.add
 /**
  * 单 Activity 外壳：顶部装饰 + 页面容器 + 顶栏 + 底部双 Tab + 迷你继续学习条。
  * 路由模型与 Web 完全一致（当前视图 view + 返回栈 navStack + Tab 归属判定）。
@@ -137,7 +144,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
             uris?.let { list ->
                 list.forEach { u -> runCatching { contentResolver.takePersistableUriPermission(u, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } }
             }
-            job?.invoke(list)
+            job?.invoke(uris)
         }
     }
 
@@ -212,7 +219,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         abin.addView(abTitleBox)
         abActions = hrow(this)
         abin.addView(abActions)
-        abEdit = iconBtn(this, "more", getString(R.string.cd_edit), 36f) { CourseEditor.open(currentCourse()) }
+        abEdit = iconBtn(this, "more", getString(R.string.cd_edit), 36f) { CourseEditor.open(this, app, currentCourse()) }
         abin.addView(abEdit)
         appbar.addView(abin, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52f)))
         root.addView(appbar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.gravity = Gravity.TOP })
@@ -427,7 +434,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
                 setImageDrawable(Icons.get(this@MainActivity, icon, if (on) Tokens.pri else Tokens.sub))
                 scaleType = ImageView.ScaleType.FIT_CENTER
             }, LinearLayout.LayoutParams(dp(23f), dp(23f)))
-            b.addView(label(this, name, 10.5f, if (on) Tokens.pri else Tokens.sub, if (on) Tokens.weightM() else Tokens.weightB()), t = 2)
+            b.add(label(this, name, 10.5f, if (on) Tokens.pri else Tokens.sub, if (on) Tokens.weightM() else Tokens.weightB()), t = 2)
             b.setOnClickListener { nav(k) }
             tabBarInner.addView(b)
         }
@@ -438,13 +445,14 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     private var readerPill: View? = null
 
     private fun updateReaderPill() {
-        val r = app.reader
-        val show = r != null && view == "today"
+        val reader = app.reader
+        val show = reader != null && view == "today"
         if (!show) {
             readerPill?.let { root.removeView(it) }
             readerPill = null
             return
         }
+        val r = reader ?: return
         if (readerPill == null) {
             val pill = hrow(this)
             pill.surface(Tokens.l2, 24f, 4f, Tokens.planet)
@@ -469,16 +477,16 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
             lp.bottomMargin = dp(70f) + bottomPad
             root.addView(pill, lp)
             readerPill = pill
-            (play as ImageView).setImageDrawable(Icons.get(this, if (r.on) "pause" else "play", Tokens.pri))
+            (play as ImageView).setImageDrawable(Icons.get(this, if (reader.on) "pause" else "play", Tokens.pri))
         }
         ((readerPill as LinearLayout).getChildAt(0) as ImageView)
-            .setImageDrawable(Icons.get(this, if (r.on) "pause" else "play", Tokens.pri))
-        readerPill?.alpha = if (r.segsSize() > 0) 1f else 0.4f
+            .setImageDrawable(Icons.get(this, if (reader.on) "pause" else "play", Tokens.pri))
+        readerPill?.alpha = if (reader.segsSize() > 0) 1f else 0.4f
     }
 
     override fun onResume() {
         super.onResume()
-        app.timer.onResume(view)
+        app.timer.onResume()
         mini.reappearOnResume()
         render()
     }
@@ -491,12 +499,12 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        app.systemDark = newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+        app.updateSystemDark(newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES)
         app.retheme()
     }
 
     override fun onBackPressed() {
-        goBack()
+        if (selectionBar.isOpen() || view != "mine" || navStack.isNotEmpty()) goBack() else super.onBackPressed()
     }
 
     override fun onDestroy() {

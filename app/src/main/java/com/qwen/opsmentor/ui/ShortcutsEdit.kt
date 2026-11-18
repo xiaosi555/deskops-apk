@@ -8,7 +8,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.qwen.opsmentor.App
-import com.qwen.opsmentor.core.Bars
+import com.qwen.opsmentor.ui.Bars
 import com.qwen.opsmentor.core.Icons
 import com.qwen.opsmentor.core.Opt
 import com.qwen.opsmentor.core.Sheets
@@ -75,7 +75,6 @@ object ShortcutsEdit {
         b.setPadding(0, ctx.dp(9f), 0, ctx.dp(9f))
         if (!img) {
             val ic = iconView(ctx, ICONS[sc.target] ?: "layers", if (sc.color.isEmpty() && !preview) Tokens.pri else tc, 18f)
-            ic.gravity = Gravity.CENTER
             b.addView(ic, LinearLayout.LayoutParams(ctx.dp(18f), ctx.dp(18f)).also { it.gravity = Gravity.CENTER_HORIZONTAL })
         }
         val lab = label(ctx, sc.name.ifBlank { "未命名" }, if (Tokens.planet) 12f else 11.5f, tc, Tokens.weightM())
@@ -174,7 +173,7 @@ object ShortcutsEdit {
         if (!isNew) {
             val del = btn(ctx, "删除这个入口", "danger", small = true)
             del.setOnClickListener {
-                Sheets.confirm(ctx, "删除「${it.name.ifBlank { "未命名" }}」？", "删除入口", "删除", true) {
+                Sheets.confirm(ctx, "删除「${name.ifBlank { "未命名" }}」？", "删除入口", "删除", true) {
                     list.removeAt(idx); app.store.save(); app.rerender?.invoke()
                     Sheets.closeAll()
                 }
@@ -224,7 +223,7 @@ object ShortcutsEdit {
             flat(Tokens.l2, ctx.dp(Tokens.rCard()))
             setPadding(ctx.dp(14f), ctx.dp(6f), ctx.dp(14f), ctx.dp(6f))
         }
-        (list2.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = ctx.dp(10f)
+        list2.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(10f) }
         list.forEachIndexed { i, s ->
             val r = hrow(ctx)
             r.setPadding(0, ctx.dp(12f), 0, ctx.dp(12f))

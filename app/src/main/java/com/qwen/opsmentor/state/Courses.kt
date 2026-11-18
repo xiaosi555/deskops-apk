@@ -17,7 +17,7 @@ object Courses {
         val glyph: String,
         val coverClass: String,
         val custom: Boolean,
-        val media: String = ,
+        val media: String = "",
     )
 
     const val OPS = Store.COURSE_OPS
@@ -66,7 +66,7 @@ object Courses {
 
     fun descOf(store: Store, co: Entry, pack: Pack): String {
         val m = store.co[co.id]
-        return (m?.desc?.takeIf { it.isNotBlank() } ?: co.desc).ifBlank { pack.title }
+        return (m?.desc?.takeIf { it.isNotBlank() } ?: co.desc).ifBlank { co.title }
     }
 
     fun typeOf(store: Store, co: Entry): String =

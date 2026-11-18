@@ -47,7 +47,7 @@ fun View.itemIn(delay: Long = 0) {
     if (Tokens.reducedMotion) return
     val set = AnimationSet(false)
     val a = android.view.animation.AlphaAnimation(0f, 1f)
-    val t = TranslateAnimation(0f, 0f, dp(8f).toFloat(), 0f)
+    val t = TranslateAnimation(0f, 0f, context.dp(8f).toFloat(), 0f)
     a.duration = 240; t.duration = 240
     t.interpolator = SNAP
     set.addAnimation(a); set.addAnimation(t)
@@ -116,9 +116,9 @@ fun ctx_wrap(ctx: Context): FrameLayout = FrameLayout(ctx)
 fun ViewGroup.add(v: View, w: Int = ViewGroup.LayoutParams.MATCH_PARENT, h: Int = ViewGroup.LayoutParams.WRAP_CONTENT,
                   l: Int = 0, t: Int = 0, r: Int = 0, b: Int = 0, weight: Float = 0f): View {
     val d = context.resources.displayMetrics.density
-    val lp = if (this is LinearLayout) LinearLayout.LayoutParams(w, h) else LayoutParams(w, h)
+    val lp = if (this is LinearLayout) LinearLayout.LayoutParams(w, h) else ViewGroup.LayoutParams(w, h)
     if (lp is LinearLayout.LayoutParams) lp.weight = weight
-    lp.setMargins((l * d).toInt(), (t * d).toInt(), (r * d).toInt(), (b * d).toInt())
+    if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) lp.setMargins((l * d).toInt(), (t * d).toInt(), (r * d).toInt(), (b * d).toInt())
     addView(v, lp)
     return v
 }
@@ -264,7 +264,7 @@ fun pill(ctx: Context, s: String, strong: Boolean = false): TextView = TextView(
 fun chip(ctx: Context, s: String, on: Boolean, icoName: String? = null, badge: Int = 0, onClick: () -> Unit): LinearLayout =
     hrow(ctx).apply {
         setPadding(ctx.dp(13f), ctx.dp(8f), ctx.dp(13f), ctx.dp(8f))
-        if (on) flat(if (Tokens.planet) Tokens.priSoft else Tokens.pri, ctx.dp(if (Tokens.planet) 12f else 12f))
+        if (on) flat(if (Tokens.planet) Tokens.priSoft else Tokens.pri, ctx.dp(if (Tokens.planet) 12f else 12f).toFloat())
         else surface(if (Tokens.planet) Tokens.l3 else Tokens.l2, 12f, 1f, true)
         val tc = when {
             on && Tokens.planet -> Tokens.pri
@@ -342,3 +342,39 @@ fun groupTitle(ctx: Context, s: String): LinearLayout = LinearLayout(ctx).apply 
 fun newGroup(host: LinearLayout, ctx: Context, s: String): LinearLayout = groupTitle(ctx, s).also {
     host.addView(it)
 }
+
+
+fun muted(ctx: Context, text: CharSequence, sizeSp: Float = 12.5f, maxLines: Int = 0): TextView =
+    label(ctx, text, sizeSp, Tokens.sub, Tokens.weightB(), maxLines).apply { setLineSpacing(0f, 1.18f) }
+
+fun mono(ctx: Context, text: String, output: Boolean = false): TextView = TextView(ctx).apply {
+    this.text = text
+    setTextColor(if (output) Tokens.sub else if (Tokens.dark) 0xFFCFE8D8.toInt() else 0xFF24533B.toInt())
+    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+    typeface = Typeface.MONOSPACE
+    setPadding(ctx.dp(12f), ctx.dp(10f), ctx.dp(12f), ctx.dp(10f))
+    setLineSpacing(0f, 1.2f)
+    flat(if (output) Tokens.l3 else Tokens.withAlpha(Tokens.pri, 0.08f), ctx.dp(10f).toFloat())
+    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+}
+
+fun noteBox(ctx: Context, title: String, body: String): LinearLayout = vcol(ctx).apply {
+    setPadding(ctx.dp(12f), ctx.dp(10f), ctx.dp(12f), ctx.dp(10f))
+    flat(Tokens.priSoft, ctx.dp(10f).toFloat())
+    if (title.isNotBlank()) addView(label(ctx, title, 13f, Tokens.pri, Tokens.weightM()))
+    addView(muted(ctx, body, 12.5f))
+}
+
+fun emptyState(ctx: Context, icon: String, title: String, subtitle: String): LinearLayout = vcol(ctx).apply {
+    gravity = Gravity.CENTER
+    setPadding(ctx.dp(24f), ctx.dp(34f), ctx.dp(24f), ctx.dp(34f))
+    addView(iconView(ctx, icon, Tokens.sub, 30f))
+    addView(label(ctx, title, 15f, Tokens.ink, Tokens.weightM()),
+        LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = ctx.dp(12f) })
+    addView(muted(ctx, subtitle, 12.5f),
+        LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = ctx.dp(5f) })
+}
+
+fun View.flat(color: Int, radiusPx: Int) = flat(color, radiusPx.toFloat())
+fun View.surface(color: Int, radiusPx: Int, elevationDp: Float = 0f, stroke: Boolean = false) =
+    surface(color, radiusPx.toFloat(), elevationDp, stroke)

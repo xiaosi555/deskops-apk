@@ -129,7 +129,7 @@ class SelectionBar(private val act: Activity, private val app: App) {
             box.addView(View(ctx).apply {
                 background = TyPreview(t.id, Tokens.ink)
             }, FrameLayout.LayoutParams(ctx.dp(22f), ctx.dp(14f)).also { it.gravity = Gravity.CENTER })
-            box.setOnClickListener { curTy = t.id; paintSwatches(); animatePop() }
+            box.setOnClickListener { curTy = t.id; paintSwatches(); box.animatePop() }
             bar.addView(box)
             tyViews.add(t.id to box)
         }
@@ -145,7 +145,7 @@ class SelectionBar(private val act: Activity, private val app: App) {
             }
             box.addView(View(ctx).apply { circle(Color.parseColor(c.hex)) },
                 FrameLayout.LayoutParams(ctx.dp(17f), ctx.dp(17f)).also { it.gravity = Gravity.CENTER })
-            box.setOnClickListener { curCo = c.id; paintSwatches(); animatePop() }
+            box.setOnClickListener { curCo = c.id; paintSwatches(); box.animatePop() }
             bar.addView(box)
             coViews.add(c.id to box)
         }
@@ -180,12 +180,12 @@ class SelectionBar(private val act: Activity, private val app: App) {
         val root = act.findViewById<FrameLayout>(android.R.id.content) ?: return
         val loc = IntArray(2); v.getLocationInWindow(loc)
         val scr = IntArray(2); root.getLocationInWindow(scr)
-        val w = if (b.width > 0) b.width.toFloat() else app.dp(300f)
+        val w = if (b.width > 0) b.width.toFloat() else app.dp(300f).toFloat().toFloat().toFloat().toFloat().toFloat().toFloat().toFloat().toFloat().toFloat()
         val h = if (b.height > 0) b.height.toFloat() else app.dp(44f).toFloat()
         var x = if (app.store.barX >= 0) app.store.barX else (loc[0] - scr[0]).toFloat()
         var y = if (app.store.barY >= 0) app.store.barY else (loc[1] - scr[1] - h - app.dp(10f))
-        x = x.coerceIn(app.dp(6f).toFloat(), max(app.dp(6f).toFloat(), root.width - w - app.dp(6f)))
-        y = y.coerceIn(app.dp(48f).toFloat(), max(app.dp(48f).toFloat(), root.height - h - app.dp(84f)))
+        x = x.coerceIn(app.dp(6f).toFloat(), max(app.dp(6f).toFloat(), root.width.toFloat() - w - app.dp(6f).toFloat()))
+        y = y.coerceIn(app.dp(48f).toFloat(), max(app.dp(48f).toFloat(), root.height.toFloat() - h - app.dp(84f).toFloat()))
         b.x = x; b.y = y
         app.store.barX = x; app.store.barY = y
         target?.setSelection(start, end)
@@ -252,8 +252,8 @@ class SelectionBar(private val act: Activity, private val app: App) {
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (!down || root == null) return@setOnTouchListener false
-                    bar.x = (e.rawX - dx).coerceIn(app.dp(6f).toFloat(), root.width - bar.width - app.dp(6f))
-                    bar.y = (e.rawY - dy).coerceIn(app.dp(48f).toFloat(), root.height - bar.height - app.dp(84f))
+                    bar.x = (e.rawX - dx).coerceIn(app.dp(6f).toFloat(), root.width.toFloat() - bar.width.toFloat() - app.dp(6f).toFloat())
+                    bar.y = (e.rawY - dy).coerceIn(app.dp(48f).toFloat(), root.height.toFloat() - bar.height.toFloat() - app.dp(84f).toFloat())
                     app.store.barX = bar.x; app.store.barY = bar.y
                     true
                 }
@@ -310,7 +310,7 @@ object MarkEditor {
         quote.setPadding(ctx.dp(12f), ctx.dp(12f), ctx.dp(12f), ctx.dp(12f))
         body.addView(quote)
 
-        body.addView(label(ctx, "线型", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(14f))
+        body.add(label(ctx, "线型", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(14f))
         val tyRow = hrow(ctx)
         LineType.values().forEach { t ->
             val c = Chip(ctx, t.label, m.ty == t.id) { on ->
@@ -322,7 +322,7 @@ object MarkEditor {
         }
         body.addView(tyRow)
 
-        body.addView(label(ctx, "颜色", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
+        body.add(label(ctx, "颜色", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
         val coRow = hrow(ctx)
         val coChips = ArrayList<Pair<String, Chip>>()
         MarkColor.values().forEach { c ->
@@ -346,7 +346,7 @@ object MarkEditor {
         }
         repaintCo()
 
-        body.addView(label(ctx, "标签", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
+        body.add(label(ctx, "标签", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
         val tagBox = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
         val tags = ArrayList(TAG_PRESET)
         m.tags.forEach { if (!tags.contains(it)) tags.add(it) }
@@ -375,7 +375,7 @@ object MarkEditor {
             addView(tagBox, ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         })
 
-        body.addView(label(ctx, "备注（多行）", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
+        body.add(label(ctx, "备注（多行）", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
         val edit = Sheets.input(ctx, m.n, "写下为什么划它、面试怎么讲", 0, true)
         edit.minLines = 3
         body.addView(edit)

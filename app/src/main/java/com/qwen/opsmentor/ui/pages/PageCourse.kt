@@ -1,4 +1,5 @@
 package com.qwen.opsmentor.ui.pages
+import com.qwen.opsmentor.core.animatePop
 
 import android.app.Activity
 import android.view.Gravity
@@ -7,7 +8,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.qwen.opsmentor.App
-import com.qwen.opsmentor.core.Bars
+import com.qwen.opsmentor.ui.Bars
 import com.qwen.opsmentor.core.Covers
 import com.qwen.opsmentor.core.Icons
 import com.qwen.opsmentor.core.Opt
@@ -73,7 +74,7 @@ class PageCourse(act: Activity, app: App) : Page(act, app) {
         head.setPadding(0, ctx.dp(4f), 0, 0)
         val left = vcol(ctx)
         left.addView(label(ctx, title, 23f, Tokens.ink, Tokens.weightH(), 3))
-        if (sub.isNotEmpty()) left.addView(muted(ctx, sub, 13f, 3), t = 8)
+        if (sub.isNotEmpty()) left.add(muted(ctx, sub, 13f, 3), t = 8)
         val by = hrow(ctx)
         by.setPadding(0, ctx.dp(10f), 0, 0)
         val av = FrameLayout(ctx).apply { flat(0, ctx.dp(14f).toFloat()) }
@@ -259,7 +260,7 @@ class PageCourse(act: Activity, app: App) : Page(act, app) {
         t.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(24f)))
         t.addView(label(ctx, label2, 12.5f, Tokens.ink, Tokens.weightM()), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
         t.isClickable = true
-        t.setOnClickListener { animatePop(); onClick() }
+        t.setOnClickListener { t.animatePop(); onClick() }
         return t
     }
 
@@ -274,8 +275,8 @@ class PageCourse(act: Activity, app: App) : Page(act, app) {
         hero.addView(Covers.view(ctx, ctx.dp(86f), cover.ifBlank { null }, co.coverClass, Courses.glyph(app.store, co)))
         val ci = vcol(ctx)
         ci.addView(label(ctx, title, 20f, Tokens.ink, Tokens.weightH(), 2))
-        ci.addView(muted(ctx, sub, 13f, 3), t = 6)
-        ci.addView(label(ctx, "${pack.mods.size} 模块 · ${pack.ch.size} 章 · ${pack.routes.size} 条学习路线", 11.5f, Tokens.sub), t = 8)
+        ci.add(muted(ctx, sub, 13f, 3), t = 6)
+        ci.add(label(ctx, "${pack.mods.size} 模块 · ${pack.ch.size} 章 · ${pack.routes.size} 条学习路线", 11.5f, Tokens.sub), t = 8)
         hero.addView(ci, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(13f) })
         host.addView(hero, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(12f) })
 
@@ -320,12 +321,6 @@ class PageCourse(act: Activity, app: App) : Page(act, app) {
 
     // ---------------- 共享 ----------------
 
-    private fun currentChapterId(): String {
-        val b = app.store.bag()
-        if (b.pin.isNotEmpty() && pack.chById(b.pin) != null) return b.pin
-        val q = pack.route(b.route)
-        return if (q.isEmpty()) "" else q[b.idx.coerceIn(0, q.size - 1)]
-    }
 
     private fun openChapter(id: String) = (act as? MainActivity)?.openChapter(id) ?: run { nav("today") }
 

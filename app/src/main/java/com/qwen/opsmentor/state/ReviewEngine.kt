@@ -1,6 +1,7 @@
 package com.qwen.opsmentor.state
 
 import com.qwen.opsmentor.data.Pack
+import com.qwen.opsmentor.data.Chapter
 
 /** 间隔提取复习（§7.4） */
 class DueItem(val id: String, val ch: Chapter?, val iv: Int, val diff: Int)
