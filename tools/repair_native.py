@@ -355,3 +355,37 @@ def readerfix(s):
 edit("ui/MainActivity.kt", readerfix)
 
 print("Second-pass repair complete.")
+
+
+# Third-pass corrections: clean up the small remaining type and receiver issues.
+rep("state/Courses.kt", [(".ifBlank { pack.title }", ".ifBlank { co.title }")])
+rep("ui/MiniBar.kt", [("        val ctx = context\n        val ctx = context\n", "        val ctx = context\n")])
+rep("ui/Page.kt", [("import android.widget.FrameLayout", "import android.widget.FrameLayout")])
+def pageimports(s):
+    if "import android.widget.FrameLayout" not in s:
+        s=s.replace("import android.widget.", "import android.widget.FrameLayout\nimport android.widget.",1)
+    return s
+edit("ui/Page.kt",pageimports)
+rep("ui/Rows.kt", [("ctx.dp(Tokens.rInner()).toFloat()\n", "ctx.dp(Tokens.rInner()).toFloat())\n")])
+rep("ui/ShortcutsEdit.kt", [
+    ('Sheets.confirm(ctx, "删除「${s.name.ifBlank { "未命名" }}」？"', 'Sheets.confirm(ctx, "删除「${name.ifBlank { "未命名" }}」？"')
+])
+rep("ui/pages/MarksPages.kt", [
+    ("(wrap.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = ctx.dp(8f)",
+     "wrap.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) }")
+])
+rep("ui/pages/PageMine.kt", [
+    ("(box.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {\n            it.topMargin = ctx.dp(10f)\n        })",
+     "box.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(10f) }")
+])
+rep("ui/pages/PageCourse.kt", [("t.setOnClickListener { animatePop(); onClick() }", "t.setOnClickListener { t.animatePop(); onClick() }")])
+rep("core/Selection.kt", [
+    ("box.setOnClickListener { curTy = t.id; paintSwatches(); animatePop() }", "box.setOnClickListener { curTy = t.id; paintSwatches(); box.animatePop() }"),
+    ("box.setOnClickListener { curCo = c.id; paintSwatches(); animatePop() }", "box.setOnClickListener { curCo = c.id; paintSwatches(); box.animatePop() }"),
+    ("else app.dp(300f)", "else app.dp(300f).toFloat()")
+])
+rep("ui/pages/PageProfile.kt", [
+    ('        body.addView(label(act, "查看完整数据说明与导入导出入口 ›", 13.5f, Tokens.pri, Tokens.weightM()),\n            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(12f) }).also {\n            it.setOnClickListener { nav("io") }\n        }',
+     '        val link = label(act, "查看完整数据说明与导入导出入口 ›", 13.5f, Tokens.pri, Tokens.weightM())\n        link.setOnClickListener { nav("io") }\n        body.addView(link, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(12f) })')
+])
+print("Third-pass repair complete.")
