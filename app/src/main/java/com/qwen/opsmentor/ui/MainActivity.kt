@@ -587,6 +587,11 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         render()
     }
 
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        if (::app.isInitialized) app.timer.poke(app.store)
+    }
+
     override fun onPause() {
         super.onPause()
         app.timer.onPause()
