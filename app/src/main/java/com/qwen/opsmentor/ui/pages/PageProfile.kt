@@ -50,7 +50,7 @@ class PageProfile(act: Activity, app: App) : Page(act, app) {
         val pct = pr.pct().coerceIn(0, 100)
 
         // HTML: #v-profile 从星球顶部装饰带下沿开始，头像与个人资料横向排列。
-        host.setPadding(host.paddingLeft, ctx.dp(if (Tokens.planet) 48f else 18f), host.paddingRight, host.paddingBottom)
+        host.setPadding(host.paddingLeft, ctx.dp(if (Tokens.planet) 48f else 22f), host.paddingRight, host.paddingBottom)
         val head = hrow(ctx).apply { setPadding(0, ctx.dp(8f), 0, ctx.dp(18f)) }
         val info = vcol(ctx)
         val nameRow = hrow(ctx)
@@ -131,7 +131,7 @@ class PageProfile(act: Activity, app: App) : Page(act, app) {
 
         val first = vcol(ctx)
         profileRow(first, "book", "课程", Courses.all(s).size.toString()) { nav("course-manage") }
-        profileRow(first, "highlighter", "划线", s.allMarks().size.toString()) { nav("my-marks") }
+        profileRow(first, "highlighter", "划线", s.marks.size.toString()) { nav("my-marks") }
         profileRow(first, "calendar", "学习日历", "") { nav("calendar") }
         host.addView(first)
 
