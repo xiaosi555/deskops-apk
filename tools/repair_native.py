@@ -389,3 +389,14 @@ rep("ui/pages/PageProfile.kt", [
      '        val link = label(act, "查看完整数据说明与导入导出入口 ›", 13.5f, Tokens.pri, Tokens.weightM())\n        link.setOnClickListener { nav("io") }\n        body.addView(link, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(12f) })')
 ])
 print("Third-pass repair complete.")
+
+
+# Final cleanup of duplicate local bindings introduced during nullable-reader narrowing.
+rep("ui/MainActivity.kt", [
+    ("        val r = reader ?: return\\n        val r = reader ?: return\\n", "        val r = reader ?: return\\n"),
+    ("readereader.", "r.")
+])
+rep("ui/MiniBar.kt", [
+    ("        val ctx = context\\n        val ctx = context\\n", "        val ctx = context\\n")
+])
+print("Final cleanup complete.")
