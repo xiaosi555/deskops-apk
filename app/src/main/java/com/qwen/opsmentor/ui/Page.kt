@@ -64,8 +64,9 @@ abstract class Page(val act: Activity, val app: App) {
         val c = act
         val box = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            // HTML 星球版 stage 左右留白 20px；极简版为 16px
-            val pad = c.dp(if (Tokens.planet) 20f else 16f)
+            // HTML 最终版两种风格的 stage 均为 20px；窄屏媒体查询收窄为 17px。
+            val widthDp = c.resources.displayMetrics.widthPixels / c.resources.displayMetrics.density
+            val pad = c.dp(if (widthDp <= 420f) 17f else 20f)
             // HTML stage 底部预留 122px；原生容器已避开 60px 底栏，因此内容补足 62px。
             setPadding(pad, 0, pad, c.dp(62f))
         }
