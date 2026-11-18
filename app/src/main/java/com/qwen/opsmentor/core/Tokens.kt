@@ -42,15 +42,6 @@ object Tokens {
     )
     val PALETTE_NAMES = listOf("苔绿", "海盐蓝", "雾紫", "陶土", "灰蓝", "橄榄", "浅棕", "石墨", "樱粉")
 
-    private const val L0_L = 0xFFEFF3F0.toInt()
-    private const val L1_L = 0xFFF3F6F4.toInt()
-    private const val L2_L = 0xFFF9FBFA.toInt()
-    private const val L3_L = 0xFFFDFEFD.toInt()
-    private const val L0_D = 0xFF111512.toInt()
-    private const val L1_D = 0xFF151A16.toInt()
-    private const val L2_D = 0xFF1A201B.toInt()
-    private const val L3_D = 0xFF1F2621.toInt()
-
     fun refresh(store: Store, systemDark: Boolean) {
         dark = when (store.appearance) {
             Appearance.LIGHT -> false
