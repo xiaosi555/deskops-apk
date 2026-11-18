@@ -228,6 +228,7 @@ object Sheets {
     // ---------------- 选项弹层 Picker ----------------
 
     fun picker(ctx: Context, title: String, items: List<Opt>, value: String?, onPick: (String, String) -> Unit) {
+        var pickerDialog: Dialog? = null
         val list = vcol(ctx, padH = 0, padV = 0)
         items.forEach { o ->
             if (o.group.isNotEmpty()) {
@@ -239,13 +240,17 @@ object Sheets {
             val row = hrow(ctx)
             row.setPadding(ctx.dp(16f), 0, ctx.dp(16f), 0)
             val on = o.value == value
-            row.addView(iconBtn(ctx, o.icon.ifEmpty { if (on) "check" else "dot" }, o.title, 30f,
-                if (o.danger) Tokens.bad else (if (on) Tokens.pri else Tokens.sub)) {})
+            val iconBox = FrameLayout(ctx)
+            iconBox.addView(iconView(ctx, o.icon.ifEmpty { if (on) "check" else "dot" },
+                if (o.danger) Tokens.bad else (if (on) Tokens.pri else Tokens.sub), 18f),
+                FrameLayout.LayoutParams(ctx.dp(18f), ctx.dp(18f)).also { it.gravity = Gravity.CENTER })
+            row.addView(iconBox, LinearLayout.LayoutParams(ctx.dp(30f), ctx.dp(30f)))
             val copy = vcol(ctx)
             copy.addView(label(ctx, o.title, 15f, if (o.danger) Tokens.bad else Tokens.ink, Tokens.weightM()))
             if (o.sub.isNotEmpty()) copy.add(muted(ctx, o.sub, 12f), t = 2)
             row.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.leftMargin = ctx.dp(10f) })
-            if (on) row.addView(iconBtn(ctx, "checkTick", "", 22f, Tokens.pri) {})
+            if (on) row.addView(iconView(ctx, "checkTick", Tokens.pri, 18f),
+                LinearLayout.LayoutParams(ctx.dp(22f), ctx.dp(22f)))
             row.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(56f))
             val wrap = FrameLayout(ctx)
             val div = View(ctx).apply { flat(Tokens.hairc, 1f) }
@@ -253,20 +258,12 @@ object Sheets {
             list.addView(wrap, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(56f)))
             row.isClickable = true
             row.setOnClickListener {
-                Sheets.findDialog(row)?.dismiss()
+                pickerDialog?.dismiss()
                 onPick(o.value, o.title)
             }
+            row.installHtmlPressFeedback()
         }
-        sheet(ctx, title, list, null)
-    }
-
-    private fun findDialog(v: View): Dialog? {
-        var p = v.parent
-        while (p != null) {
-            if (p is Dialog) return p
-            p = (p as? View)?.parent
-        }
-        return null
+        pickerDialog = sheet(ctx, title, list, null)
     }
 
     // ---------------- 确认 / 输入 ----------------
