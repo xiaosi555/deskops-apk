@@ -34,11 +34,14 @@ class StudyTimer {
         // 在两个学习页面之间切换时保留不足一分钟的余量，不因导航而丢失。
         if (!learning) flush()
         handler.removeCallbacks(ticker)
+        val sameLearningPage = learning && pageKey == key
         pageKey = if (learning) key else ""
         active = learning
         val now = System.currentTimeMillis()
         lastTick = now
-        lastActivityAt = if (learning) now else 0L
+        // 同一页面的重绘 / 从后台恢复不等于用户活动；只有首次进入或切换学习页才刷新空闲计时。
+        if (!learning) lastActivityAt = 0L
+        else if (!sameLearningPage) lastActivityAt = now
         if (active) handler.postDelayed(ticker, 5_000L)
     }
 
