@@ -121,7 +121,7 @@ class PageMarks(act: Activity, app: App) : Page(act, app) {
             }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.marginStart = ctx.dp(8f) })
         host.addView(bar)
-        list.forEach { m -> host.addView(item(m)) }
+        list.forEach { m -> item(m) }
     }
 
     private fun item(m: Mark): View {
@@ -287,7 +287,7 @@ class PageMarksCourse(act: Activity, app: App) : Page(act, app) {
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
             return
         }
-        list.forEach { m -> host.addView(row(m)) }
+        list.forEach { m -> row(m) }
     }
 
     private fun row(m: Mark): View {
