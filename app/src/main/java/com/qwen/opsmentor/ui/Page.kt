@@ -67,7 +67,8 @@ abstract class Page(val act: Activity, val app: App) {
         val box = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
             // HTML 最终版两种风格均为 20px，窄屏收窄为 17px；左右再叠加刘海/挖孔安全区。
-            val widthDp = c.resources.displayMetrics.widthPixels / c.resources.displayMetrics.density
+            val widthPx = c.window.decorView.width.takeIf { it > 0 } ?: c.resources.displayMetrics.widthPixels
+            val widthDp = widthPx / c.resources.displayMetrics.density
             val basePad = c.dp(if (widthDp <= 420f) 17f else 20f)
             val safe = ViewCompat.getRootWindowInsets(c.window.decorView)
                 ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
@@ -97,7 +98,8 @@ abstract class Page(val act: Activity, val app: App) {
     /** Insets 更新时重新计算左右安全留白，兼容横屏挖孔与窗口尺寸变化。 */
     fun updateContentInsets() {
         val box = content ?: return
-        val widthDp = act.resources.displayMetrics.widthPixels / act.resources.displayMetrics.density
+        val widthPx = act.window.decorView.width.takeIf { it > 0 } ?: act.resources.displayMetrics.widthPixels
+        val widthDp = widthPx / act.resources.displayMetrics.density
         val basePad = act.dp(if (widthDp <= 420f) 17f else 20f)
         val safe = ViewCompat.getRootWindowInsets(act.window.decorView)
             ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
