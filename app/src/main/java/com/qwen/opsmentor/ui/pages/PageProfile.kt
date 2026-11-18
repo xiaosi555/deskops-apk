@@ -41,68 +41,128 @@ class PageProfile(act: Activity, app: App) : Page(act, app) {
 
     override fun body(host: LinearLayout) {
         val ctx = act
-        pageHead(host, "我的")
         val s = app.store
-        val pr = Courses.prog(s, pack, s.cur)
-        val pct = pr.pct()
-        // 个人信息卡
         val name = s.profileName.ifBlank { "桌面运维学习者" }
-        val bio = s.profileBio.ifBlank { "把每一次学习，留成自己的进度" }
-        val card = if (Tokens.planet) hrow(ctx) else vcol(ctx)
-        card.flat(Tokens.l2, ctx.dp(Tokens.rCard()))
-        val p = ctx.dp(16f)
-        card.setPadding(p, p, p, p)
-        val av = avatar(name, s.profileAvatar)
-        av.setOnClickListener { ProfileEditor.open(act, app) }
-        card.addView(av, LinearLayout.LayoutParams(ctx.dp(66f), ctx.dp(66f)))
-        val pi = vcol(ctx)
-        val nmRow = hrow(ctx)
-        nmRow.addView(label(ctx, name, 30f, Tokens.ink, Tokens.weightH(), 1))
-        nmRow.addView(iconView(ctx, "pen", Tokens.sub, 18f), LinearLayout.LayoutParams(ctx.dp(18f), ctx.dp(18f)).also { it.marginStart = ctx.dp(6f) })
-        pi.addView(nmRow)
-        pi.add(muted(ctx, bio, 13f, 2), t = 6)
-        card.addView(pi, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(16f) })
-        val edit = label(ctx, "编辑  ›", 13f, Tokens.sub)
-        edit.setOnClickListener { ProfileEditor.open(act, app) }
-        if (Tokens.planet) card.addView(edit)
-        host.addView(card, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
-            it.topMargin = ctx.dp(10f)
-        })
+        val bio = s.profileBio.ifBlank { "还没有设置签名" }
+        val course = Courses.find(s, s.cur)
+        val courseName = Courses.meta(s, course).first
+        val pr = Courses.prog(s, pack, s.cur)
+        val pct = pr.pct().coerceIn(0, 100)
 
-        val l1 = groupTitle(ctx, "学习空间")
-        host.addView(l1)
-        l1.addView(Rows.list(act, "book", "课程", "管理课程、封面与课程资料", Courses.all(s).size.toString()) { nav("course-manage") })
-        l1.addView(Rows.list(act, "highlighter", "划线", "按课程查看与整理已保存的重点", s.allMarks().size.toString()) { nav("my-marks") })
-        l1.addView(Rows.list(act, "calendar", "学习日历", "查看每天的学习记录与课程进度", "") { nav("calendar") })
+        // HTML: #v-profile 从星球顶部装饰带下沿开始，头像与个人资料横向排列。
+        host.setPadding(host.paddingLeft, ctx.dp(if (Tokens.planet) 48f else 18f), host.paddingRight, host.paddingBottom)
+        val head = hrow(ctx).apply { setPadding(0, ctx.dp(8f), 0, ctx.dp(18f)) }
+        val info = vcol(ctx)
+        val nameRow = hrow(ctx)
+        nameRow.addView(label(ctx, name, 30f, Tokens.ink, Tokens.weightH(), 1))
+        nameRow.addView(iconView(ctx, "chev", Tokens.sub, 18f),
+            LinearLayout.LayoutParams(ctx.dp(18f), ctx.dp(18f)).also { it.marginStart = ctx.dp(6f) })
+        info.addView(nameRow)
+        info.addView(muted(ctx, bio, 13f, 2), LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).also { it.topMargin = ctx.dp(6f) })
+        head.addView(info, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        head.addView(avatar(name, s.profileAvatar), LinearLayout.LayoutParams(ctx.dp(66f), ctx.dp(66f)))
+        head.isClickable = true
+        head.setOnClickListener { ProfileEditor.open(act, app) }
+        host.addView(head)
 
-        val l2 = groupTitle(ctx, "偏好设置")
-        host.addView(l2)
-        l2.addView(Rows.list(act, "settings", "设置", "主题色、外观与夜间模式", "") { nav("settings") })
-
-        val l3 = groupTitle(ctx, "数据与隐私")
-        host.addView(l3)
-        l3.addView(Rows.list(act, "info", "数据说明", "学习数据仅保存在本机", "") { dataSheet() })
-
-        val l4 = groupTitle(ctx, "学习概况")
-        host.addView(l4)
-        val panel = vcol(ctx)
-        panel.flat(Tokens.l2, ctx.dp(Tokens.rCard()))
-        panel.setPadding(p, p, p, p)
-        val line = hrow(ctx)
-        val big = label(ctx, "$pct%", 30f, Tokens.ink, Tokens.weightH())
-        big.countUp(pct, "%")
-        line.addView(big)
-        line.addView(label(ctx, "课程章节完成度 · ${pr.done}/${pr.total}", 12f, Tokens.sub),
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(8f) })
-        panel.addView(line)
-        panel.addView(Bars.bar(ctx, pct / 100f), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(6f)).also { it.topMargin = ctx.dp(10f) })
-        host.addView(panel)
-
-        if (Tokens.planet) {
-            val io = groupTitle(ctx, "工具箱")
-            host.addView(io)
-            io.addView(Rows.list(act, "database", "数据", "课程、学习手册、划线、进度、案例与术语", "") { nav("io") })
+        // HTML: 当前课程进度横幅，点击后直接继续今日学习。
+        val banner = FrameLayout(ctx)
+        val c1 = Tokens.mix(Tokens.l2, Tokens.pri, 0.06f)
+        val c2 = Tokens.mix(Tokens.l2, Tokens.pri, 0.12f)
+        val c3 = Tokens.mix(Tokens.l2, Tokens.pri, 0.05f)
+        banner.background = android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(c1, c2, c3)
+        ).apply { cornerRadius = ctx.dp(14f).toFloat() }
+        val bannerContent = hrow(ctx).apply {
+            setPadding(ctx.dp(20f), ctx.dp(16f), ctx.dp(20f), ctx.dp(20f))
         }
+        val bannerLeft = vcol(ctx)
+        val bannerTitle = hrow(ctx)
+        bannerTitle.addView(iconView(ctx, "sparkle", Tokens.pri, 19f))
+        bannerTitle.addView(label(ctx, courseName, 16f, Tokens.pri, Tokens.weightH(), 1),
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(8f) })
+        bannerLeft.addView(bannerTitle)
+        bannerLeft.addView(muted(ctx,
+            "已过关 \${pr.done} / \${pr.total} 章 · 累计学习 Day \${s.bag().day}",
+            12f, 2
+        ), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
+            it.topMargin = ctx.dp(6f)
+        })
+        bannerContent.addView(bannerLeft, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val action = hrow(ctx)
+        action.addView(label(ctx, if (s.bag().learn.isNotEmpty()) "继续学习" else "开始学习", 14f, Tokens.pri, Tokens.weightM()))
+        action.addView(iconView(ctx, "chev", Tokens.pri, 16f),
+            LinearLayout.LayoutParams(ctx.dp(16f), ctx.dp(16f)).also { it.marginStart = ctx.dp(2f) })
+        bannerContent.addView(action)
+        banner.addView(bannerContent, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+        val track = FrameLayout(ctx).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = ctx.dp(3f).toFloat()
+                setColor(Tokens.withAlpha(Tokens.pri, 0.16f))
+            }
+        }
+        val fill = View(ctx).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = ctx.dp(3f).toFloat()
+                setColor(Tokens.pri)
+            }
+        }
+        track.addView(fill, FrameLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT))
+        banner.addView(track, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(3f), Gravity.BOTTOM
+        ).also {
+            it.leftMargin = ctx.dp(20f); it.rightMargin = ctx.dp(20f); it.bottomMargin = ctx.dp(8f)
+        })
+        track.post {
+            val lp = fill.layoutParams as FrameLayout.LayoutParams
+            lp.width = (track.width * pct / 100f).toInt()
+            fill.layoutParams = lp
+        }
+        banner.isClickable = true
+        banner.setOnClickListener { nav("today") }
+        host.addView(banner, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).also { it.topMargin = ctx.dp(2f); it.bottomMargin = ctx.dp(14f) })
+
+        val first = vcol(ctx)
+        profileRow(first, "book", "课程", Courses.all(s).size.toString()) { nav("course-manage") }
+        profileRow(first, "highlighter", "划线", s.allMarks().size.toString()) { nav("my-marks") }
+        profileRow(first, "calendar", "学习日历", "") { nav("calendar") }
+        host.addView(first)
+
+        val divider = View(ctx).apply { flat(Tokens.hairc, 1f) }
+        host.addView(divider, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(1f)
+        ).also { it.setMargins(ctx.dp(6f), ctx.dp(10f), ctx.dp(6f), ctx.dp(10f)) })
+
+        val second = vcol(ctx)
+        profileRow(second, "settings", "设置", "") { nav("settings") }
+        profileRow(second, "layers", "快捷入口", "") { nav("shortcuts") }
+        host.addView(second)
+    }
+
+    private fun profileRow(host: LinearLayout, icon: String, title: String, tail: String, onClick: () -> Unit) {
+        val ctx = act
+        val row = hrow(ctx).apply {
+            setPadding(ctx.dp(6f), 0, ctx.dp(6f), 0)
+            isClickable = true
+            setOnClickListener { onClick() }
+        }
+        row.addView(iconView(ctx, icon, Tokens.pri, 26f),
+            LinearLayout.LayoutParams(ctx.dp(26f), ctx.dp(26f)))
+        row.addView(label(ctx, title, 18.5f, Tokens.ink, Tokens.weightM()),
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(16f) })
+        if (tail.isNotEmpty()) row.addView(label(ctx, tail, 15f, Tokens.sub))
+        row.addView(iconView(ctx, "chev", Tokens.withAlpha(Tokens.sub, 0.6f), 20f),
+            LinearLayout.LayoutParams(ctx.dp(20f), ctx.dp(20f)).also { it.marginStart = ctx.dp(8f) })
+        host.addView(row, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(64f)
+        ))
     }
 
     private fun nav(v: String) = (act as? MainActivity)?.nav(v)
