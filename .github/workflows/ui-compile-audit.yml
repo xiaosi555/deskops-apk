@@ -5,6 +5,10 @@ on:
     branches: [ui/html-design-parity]
   workflow_dispatch:
 
+concurrency:
+  group: html-design-parity-compile
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
