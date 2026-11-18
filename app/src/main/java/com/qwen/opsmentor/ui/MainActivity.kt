@@ -447,10 +447,20 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
                 isClickable = true
                 layoutParams = LinearLayout.LayoutParams(0, dp(58f), 1f)
             }
-            b.addView(ImageView(this).apply {
+            val tabIcon = ImageView(this).apply {
                 setImageDrawable(Icons.get(this@MainActivity, icon, if (on) Tokens.pri else Tokens.sub))
                 scaleType = ImageView.ScaleType.FIT_CENTER
-            }, LinearLayout.LayoutParams(dp(23f), dp(23f)))
+            }
+            // HTML iconPop：当前 Tab 图标以 450ms 轻弹进入。
+            if (on && !Tokens.reducedMotion) {
+                tabIcon.scaleX = 0.55f
+                tabIcon.scaleY = 0.55f
+                tabIcon.animate().scaleX(1f).scaleY(1f)
+                    .setDuration(450L)
+                    .setInterpolator(PathInterpolator(0.32f, 1.34f, 0.5f, 1f))
+                    .start()
+            }
+            b.addView(tabIcon, LinearLayout.LayoutParams(dp(23f), dp(23f)))
             b.add(label(this, name, 10.5f, if (on) Tokens.pri else Tokens.sub, if (on) Tokens.weightM() else Tokens.weightB()), t = 2)
             b.setOnClickListener { nav(k) }
             tabBarInner.addView(b)
