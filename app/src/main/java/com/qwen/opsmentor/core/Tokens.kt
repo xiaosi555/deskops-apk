@@ -52,7 +52,7 @@ object Tokens {
         planet = store.style == StyleMode.PLANET
         accentIndex = store.accent
         val custom = if (store.accent == -1) runCatching { Color.parseColor(store.accentCustom) }.getOrNull() else null
-        val base = custom ?: PALETTE[store.accent.coerceIn(0, PALETTE.size - 1)]
+        val base = custom ?: PALETTE[if (store.accent == -1) 4 else store.accent.coerceIn(0, PALETTE.size - 1)]
         // HTML applyAccent：暗色主色仅提亮 14%，亮色保持原始色值。
         pri = if (dark) mix(base, 0xFFFFFFFF.toInt(), 0.14f) else base
         onPri = if (ratioOn(pri) < 2.2f) 0xFF1B1D22.toInt() else 0xFFFFFFFF.toInt()
