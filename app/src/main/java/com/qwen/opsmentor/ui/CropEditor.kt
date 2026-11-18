@@ -91,15 +91,6 @@ object CropEditor {
             b.setOnClickListener { fn() }
             bar.addView(b, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.marginEnd = ctx.dp(8f) })
         }
-        tool("rotateCw", "旋转") {
-            val m = Matrix(); m.postRotate(90f)
-            img = Bitmap.createBitmap(img, 0, 0, img.width, img.height, m, true)
-            iv.setImageBitmap(img)
-            center()
-        }
-        tool("zoomOut", "缩小") { scaleBy(1 / 1.2f) }
-        tool("zoomIn", "放大") { scaleBy(1.2f) }
-        tool("resetArrow", "重置") { center() }
         col.addView(bar)
         val wrap = FrameLayout(ctx)
         val lp = FrameLayout.LayoutParams(ctx.dp(340f), ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -152,6 +143,16 @@ object CropEditor {
             clamp(); paint()
         }
 
+        tool("rotateCw", "旋转") {
+            val m = Matrix(); m.postRotate(90f)
+            img = Bitmap.createBitmap(img, 0, 0, img.width, img.height, m, true)
+            iv.setImageBitmap(img)
+            center()
+        }
+        tool("zoomOut", "缩小") { scaleBy(1 / 1.2f) }
+        tool("zoomIn", "放大") { scaleBy(1.2f) }
+        tool("resetArrow", "重置") { center() }
+
         stage.post { center() }
 
         var p0 = PointF(); var p1 = PointF(); var down = false; var multi = false
@@ -201,7 +202,7 @@ object CropEditor {
         }
     }
 
-    private fun finish(ctx: Context, act: android.app.Activity, d: Dialog, src: Bitmap, size: Int, onDone: (String)) {
+    private fun finish(ctx: Context, act: android.app.Activity, d: Dialog, src: Bitmap, size: Int, onDone: (String) -> Unit) {
         // 取景框为正方形，按当前缩放与位移采样
         val host = act as? MainActivity
         val path = host?.saveImage(src, size)

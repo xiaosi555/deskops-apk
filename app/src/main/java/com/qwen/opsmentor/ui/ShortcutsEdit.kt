@@ -8,7 +8,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.qwen.opsmentor.App
-import com.qwen.opsmentor.core.Bars
+import com.qwen.opsmentor.ui.Bars
 import com.qwen.opsmentor.core.Icons
 import com.qwen.opsmentor.core.Opt
 import com.qwen.opsmentor.core.Sheets

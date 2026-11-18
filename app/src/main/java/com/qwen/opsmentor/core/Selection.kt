@@ -310,7 +310,7 @@ object MarkEditor {
         quote.setPadding(ctx.dp(12f), ctx.dp(12f), ctx.dp(12f), ctx.dp(12f))
         body.addView(quote)
 
-        body.addView(label(ctx, "线型", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(14f))
+        body.add(label(ctx, "线型", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(14f))
         val tyRow = hrow(ctx)
         LineType.values().forEach { t ->
             val c = Chip(ctx, t.label, m.ty == t.id) { on ->
@@ -322,7 +322,7 @@ object MarkEditor {
         }
         body.addView(tyRow)
 
-        body.addView(label(ctx, "颜色", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
+        body.add(label(ctx, "颜色", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
         val coRow = hrow(ctx)
         val coChips = ArrayList<Pair<String, Chip>>()
         MarkColor.values().forEach { c ->
@@ -346,7 +346,7 @@ object MarkEditor {
         }
         repaintCo()
 
-        body.addView(label(ctx, "标签", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
+        body.add(label(ctx, "标签", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
         val tagBox = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
         val tags = ArrayList(TAG_PRESET)
         m.tags.forEach { if (!tags.contains(it)) tags.add(it) }
@@ -375,7 +375,7 @@ object MarkEditor {
             addView(tagBox, ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         })
 
-        body.addView(label(ctx, "备注（多行）", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
+        body.add(label(ctx, "备注（多行）", 12.5f, Tokens.sub, Tokens.weightM()), t = ctx.dp(12f))
         val edit = Sheets.input(ctx, m.n, "写下为什么划它、面试怎么讲", 0, true)
         edit.minLines = 3
         body.addView(edit)

@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.qwen.opsmentor.App
-import com.qwen.opsmentor.core.Bars
+import com.qwen.opsmentor.ui.Bars
 import com.qwen.opsmentor.core.Icons
 import com.qwen.opsmentor.core.Sheets
 import com.qwen.opsmentor.core.Tokens
@@ -59,7 +59,7 @@ class PageProfile(act: Activity, app: App) : Page(act, app) {
         nmRow.addView(label(ctx, name, 30f, Tokens.ink, Tokens.weightH(), 1))
         nmRow.addView(iconView(ctx, "pen", Tokens.sub, 18f), LinearLayout.LayoutParams(ctx.dp(18f), ctx.dp(18f)).also { it.marginStart = ctx.dp(6f) })
         pi.addView(nmRow)
-        pi.addView(muted(ctx, bio, 13f, 2), t = 6)
+        pi.add(muted(ctx, bio, 13f, 2), t = 6)
         card.addView(pi, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(16f) })
         val edit = label(ctx, "编辑  ›", 13f, Tokens.sub)
         edit.setOnClickListener { ProfileEditor.open(act, app) }

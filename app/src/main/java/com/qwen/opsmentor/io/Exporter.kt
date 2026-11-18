@@ -1,4 +1,5 @@
 package com.qwen.opsmentor.io
+import com.qwen.opsmentor.data.toJson
 
 import com.qwen.opsmentor.data.Lecture
 import com.qwen.opsmentor.data.Pack
@@ -28,7 +29,7 @@ object Exporter {
     )
 
     val FORMATS = listOf(Triple("json", "JSON", "完整结构"), Triple("md", "Markdown", "可读文档"), Triple("csv", "CSV", "一行一条"))
-    val EXT = mapOf("json" to "json" to "JSON 存档", "md" to "md" to "Markdown 文档", "csv" to "csv" to "CSV 表格")
+    val EXT = mapOf("json" to ("json" to "JSON 存档"), "md" to ("md" to "Markdown 文档"), "csv" to ("csv" to "CSV 表格"))
 
     fun entry(id: String?) = ENTRIES.firstOrNull { it.id == id }
 
@@ -461,3 +462,10 @@ object Exporter {
 
     fun fmtSize(n: Long): String = com.qwen.opsmentor.core.Sheets.fmtSizeLong(n)
 }
+
+
+private object MarkdownKit {
+    fun plain(parts: List<com.qwen.opsmentor.data.Part>): String = parts.joinToString("") { it.text }
+}
+private fun org.json.JSONArray.joinToString(separator: String): String =
+    (0 until length()).joinToString(separator) { optString(it) }

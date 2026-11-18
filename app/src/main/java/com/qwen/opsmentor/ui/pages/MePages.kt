@@ -11,7 +11,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.qwen.opsmentor.App
 import com.qwen.opsmentor.core.AnnotatedText
-import com.qwen.opsmentor.core.Bars
+import com.qwen.opsmentor.ui.Bars
 import com.qwen.opsmentor.core.Covers
 import com.qwen.opsmentor.core.Icons
 import com.qwen.opsmentor.core.Opt

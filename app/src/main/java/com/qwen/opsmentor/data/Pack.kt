@@ -208,7 +208,7 @@ data class Chapter(
     val id: String, val m: String, val t: String, val s: String,
     val terms: String, val plain: List<Pair<String, String>>,
     val cmds: List<Cmd>, val pits: List<Pit>, val gate: String,
-    val quiz: Quiz, val content: String = "",
+    val quiz: Quiz, val content: String = "", val media: MediaRef? = null,
 )
 
 /** 知识详解：标题+细节 / 命令+回显 / 名称+链路 */
@@ -259,7 +259,7 @@ class LongLecture(
                     practice += StepBlock(
                         x.optString("t"), x.optString("d"), x.optString("cmd"),
                         x.optString("out"), x.optString("read"), x.optString("md"),
-                        Parts.from(x.optJSONArray("parts")),
+                        Part.from(x.optJSONArray("parts")),
                     )
                 }
             }
@@ -306,7 +306,7 @@ data class ConceptBlock(
                     }
                 }
             }
-            return ConceptBlock(x.optString("p"), ul, head, rows, x.optString("md"), x.optString("t"), Parts.from(x.optJSONArray("parts")))
+            return ConceptBlock(x.optString("p"), ul, head, rows, x.optString("md"), x.optString("t"), Part.from(x.optJSONArray("parts")))
         }
 
         private fun JSONArray?.orEmpty(): JSONArray = this ?: JSONArray()
@@ -330,7 +330,7 @@ data class Part(val text: String, val b: Boolean = false, val code: Boolean = fa
 
 data class StepBlock(
     val t: String, val d: String, val cmd: String,
-    val out: String, val read: String, val md: String,
+    val out: String, val read: String, val md: String = "",
     val parts: List<Part> = emptyList(),
 ) {
     val hasCmd get() = cmd.isNotBlank()

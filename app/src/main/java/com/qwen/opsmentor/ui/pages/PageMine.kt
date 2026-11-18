@@ -191,8 +191,8 @@ class PageMine(act: Activity, app: App) : Page(act, app) {
                 el.addView(th)
                 val mn = vcol(ctx)
                 mn.addView(label(ctx, c.id + " " + c.t, 12f, Tokens.sub, 400))
-                mn.addView(label(ctx, row.first, 15.5f, Tokens.ink, Tokens.weightM()), t = 2)
-                mn.addView(muted(ctx, row.second, 12.5f, 2), t = 2)
+                mn.add(label(ctx, row.first, 15.5f, Tokens.ink, Tokens.weightM()), t = 2)
+                mn.add(muted(ctx, row.second, 12.5f, 2), t = 2)
                 el.addView(mn, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(13f) })
                 host.addView(el)
             }
@@ -217,22 +217,22 @@ class PageMine(act: Activity, app: App) : Page(act, app) {
             return
         }
         if (r.first.isNotEmpty()) {
-            host.addView(label(ctx, "课程 · ${r.first.size}", 13f, Tokens.sub, Tokens.weightM()), t = 14)
+            host.add(label(ctx, "课程 · ${r.first.size}", 13f, Tokens.sub, Tokens.weightM()), t = 14)
             r.first.forEach { co -> host.addView(Rows.courseCard(act, app, co, Courses.prog(app.store, app.packs.of(app.store, co.id), co.id)) { openCourse(co) }) }
         }
         if (r.second.isNotEmpty()) {
-            host.addView(label(ctx, "章节 · ${r.second.size}", 13f, Tokens.sub, Tokens.weightM()), t = 14)
+            host.add(label(ctx, "章节 · ${r.second.size}", 13f, Tokens.sub, Tokens.weightM()), t = 14)
             r.second.take(30).forEach { c -> host.addView(Rows.chapter(act, app, pack, c, currentId(), { openChapter(c.id) })) }
         }
         if (r.third.isNotEmpty()) {
-            host.addView(label(ctx, "知识点 · ${minOf(r.third.size, 30)}${if (r.third.size >= 30) "+" else ""}", 13f, Tokens.sub, Tokens.weightM()), t = 14)
+            host.add(label(ctx, "知识点 · ${minOf(r.third.size, 30)}${if (r.third.size >= 30) "+" else ""}", 13f, Tokens.sub, Tokens.weightM()), t = 14)
             r.third.forEach { (c, row) ->
                 val el = vcol(ctx)
                 el.surface(Tokens.l2, Tokens.rInner(), 1f, true)
                 el.setPadding(ctx.dp(12f), ctx.dp(12f), ctx.dp(12f), ctx.dp(12f))
                 el.addView(label(ctx, c.id + " " + c.t, 12f, Tokens.pri, Tokens.weightM()))
-                el.addView(label(ctx, row.first, 15f, Tokens.ink, Tokens.weightM()), t = 4)
-                el.addView(muted(ctx, row.second, 12.5f, 3), t = 3)
+                el.add(label(ctx, row.first, 15f, Tokens.ink, Tokens.weightM()), t = 4)
+                el.add(muted(ctx, row.second, 12.5f, 3), t = 3)
                 el.isClickable = true
                 el.setOnClickListener { openChapter(c.id) }
                 host.addView(el, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) })

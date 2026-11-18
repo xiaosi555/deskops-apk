@@ -66,7 +66,7 @@ object CourseEditor {
         cb.addView(rm, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
         row.addView(cb, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(12f) })
         body.addView(row)
-        body.addView(Sheets.field(ctx, "课程名称", Sheets.input(ctx, meta.first, "课程名称", 40)), t = 10)
+        body.add(Sheets.field(ctx, "课程名称", Sheets.input(ctx, meta.first, "课程名称", 40)), t = 10)
         body.addView(Sheets.field(ctx, "课程简介", Sheets.input(ctx, meta.second, "一句话介绍这门课程", 200, true)))
         val glyphBox = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
         Icons.COURSE_GLYPHS.forEach { g ->
@@ -137,7 +137,7 @@ object CourseEditor {
         val up = btn(ctx, "上传封面", "n")
         up.setOnClickListener { ImagePick.pick(ctx, 480) { cover = it; up.text = "封面已选择 ✓" } }
         body.addView(up)
-        body.addView(Sheets.field(ctx, "课程名称", Sheets.input(ctx, "", "课程名称", 40)), t = 8)
+        body.add(Sheets.field(ctx, "课程名称", Sheets.input(ctx, "", "课程名称", 40)), t = 8)
         body.addView(Sheets.field(ctx, "课程简介", Sheets.input(ctx, "", "课程简介", 200, true)))
         val ti = body.getChildAt(1).getChildAt(1) as EditText
         val su = body.getChildAt(2).getChildAt(1) as EditText
@@ -206,7 +206,7 @@ object ProfileEditor {
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
             override fun afterTextChanged(s: android.text.Editable?) { if (avatar.isEmpty()) paint() }
         })
-        body.addView(Sheets.field(ctx, "昵称", nameInp), t = 8)
+        body.add(Sheets.field(ctx, "昵称", nameInp), t = 8)
         val bio = Sheets.input(ctx, s.profileBio, "个性签名 / 学习目标（选填）", 40)
         body.addView(Sheets.field(ctx, "个性签名", bio))
         Sheets.sheet(ctx, "编辑个人信息", body, "保存", onSave = {

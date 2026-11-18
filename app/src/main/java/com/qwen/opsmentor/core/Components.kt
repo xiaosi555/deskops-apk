@@ -225,11 +225,11 @@ class Table(private val ctx: Context) {
             return r
         }
         val headRow = row(rows.first(), true)
-        headRow.flat(Tokens.withAlpha(Tokens.pri, if (Tokens.planet) 0.10f else 0.06f), ctx.dp(Tokens.rInner()))
+        headRow.flat(Tokens.withAlpha(Tokens.pri, if (Tokens.planet) 0.10f else 0.06f), ctx.dp(Tokens.rInner()).toFloat())
         grid.addView(headRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         rows.drop(1).forEachIndexed { idx, cells ->
             val r = row(cells, false)
-            if (idx % 2 == 1) r.flat(Tokens.l3, ctx.dp(Tokens.rInner()))
+            if (idx % 2 == 1) r.flat(Tokens.l3, ctx.dp(Tokens.rInner()).toFloat())
             grid.addView(r, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
             grid.addView(View(ctx).apply { flat(Tokens.hairc, 1f) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(1f)))
         }
@@ -258,7 +258,7 @@ object Covers {
         } else {
             val colors = GRADS[coverClass] ?: intArrayOf(Tokens.pri, Tokens.withAlpha(Tokens.pri, 1f))
             val g = android.graphics.drawable.GradientDrawable()
-            g.orientation = android.graphics.drawable.GradientDrawable.TL_BR
+            g.orientation = android.graphics.drawable.GradientDrawable.Orientation.TL_BR
             g.colors = colors
             g.cornerRadius = r
             v.background = g
@@ -339,7 +339,7 @@ class DecoView(ctx: Context, private var kind: String, private val heightPx: Int
         override fun run() {
             t += 0.016f
             invalidate()
-            if (dynamic() && !isNone() && attachedToWindow && !Tokens.reducedMotion) postDelayed(this, 40)
+            if (dynamic() && !isNone() && isAttachedToWindow && !Tokens.reducedMotion) postDelayed(this, 40)
         }
     }
 
@@ -424,7 +424,7 @@ class DecoView(ctx: Context, private var kind: String, private val heightPx: Int
                     val x = ((i * 137.5f) % w)
                     val y = ((i * 71.3f) % h)
                     val r = resources.displayMetrics.density * (0.8f + (i % 3) * 0.5f)
-                    val a = 0.25f + 0.6f * Math.abs(Math.sin(t + i)).toFloat()
+                    val a = 0.25f + 0.6f * kotlin.math.abs(kotlin.math.sin((t + i).toDouble())).toFloat()
                     paint.alpha = (a * 255).toInt()
                     c.drawCircle(x, y, r, paint)
                     i++

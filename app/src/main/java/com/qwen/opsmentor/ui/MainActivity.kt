@@ -1,4 +1,9 @@
 package com.qwen.opsmentor.ui
+import android.graphics.Rect
+import android.graphics.Canvas
+import android.graphics.Bitmap
+import java.io.FileOutputStream
+import java.io.File
 
 import android.content.res.Configuration
 import android.graphics.Color
@@ -32,6 +37,7 @@ import com.qwen.opsmentor.state.Bus
 import com.qwen.opsmentor.state.Courses
 import com.qwen.opsmentor.ui.pages.*
 
+import com.qwen.opsmentor.core.add
 /**
  * 单 Activity 外壳：顶部装饰 + 页面容器 + 顶栏 + 底部双 Tab + 迷你继续学习条。
  * 路由模型与 Web 完全一致（当前视图 view + 返回栈 navStack + Tab 归属判定）。
@@ -137,7 +143,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
             uris?.let { list ->
                 list.forEach { u -> runCatching { contentResolver.takePersistableUriPermission(u, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } }
             }
-            job?.invoke(list)
+            job?.invoke(uris)
         }
     }
 
@@ -427,7 +433,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
                 setImageDrawable(Icons.get(this@MainActivity, icon, if (on) Tokens.pri else Tokens.sub))
                 scaleType = ImageView.ScaleType.FIT_CENTER
             }, LinearLayout.LayoutParams(dp(23f), dp(23f)))
-            b.addView(label(this, name, 10.5f, if (on) Tokens.pri else Tokens.sub, if (on) Tokens.weightM() else Tokens.weightB()), t = 2)
+            b.add(label(this, name, 10.5f, if (on) Tokens.pri else Tokens.sub, if (on) Tokens.weightM() else Tokens.weightB()), t = 2)
             b.setOnClickListener { nav(k) }
             tabBarInner.addView(b)
         }

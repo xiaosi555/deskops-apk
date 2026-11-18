@@ -1,6 +1,8 @@
 package com.qwen.opsmentor.media
+import com.qwen.opsmentor.data.toJson
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
@@ -81,7 +83,7 @@ object MediaCourses {
 
     /** 自然排序（1、2、10 排在正确位置） */
     fun sortItems(items: List<MediaItem>, by: String, asc: Boolean): List<MediaItem> {
-        val cmp = if (by == "time") compareBy({ it.time }, { naturalKey(it.name) }) else compareBy({ naturalKey(it.name) }, { it.time })
+        val cmp = if (by == "time") compareBy<MediaItem>({ it.time }, { naturalKey(it.name) }) else compareBy<MediaItem>({ naturalKey(it.name) }, { it.time })
         val sorted = items.sortedWith(cmp)
         return if (asc) sorted else sorted.reversed()
     }

@@ -17,7 +17,7 @@ object Courses {
         val glyph: String,
         val coverClass: String,
         val custom: Boolean,
-        val media: String = ,
+        val media: String = "",
     )
 
     const val OPS = Store.COURSE_OPS
