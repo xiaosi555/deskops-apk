@@ -193,7 +193,7 @@ abstract class Page(val act: Activity, val app: App) {
         val hd = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, c.dp(if (big) 26f else 12f), 0, c.dp(4f))
+            setPadding(0, c.dp(if (big) 20f else 12f), 0, c.dp(4f))
         }
         hd.addView(label(c, title, if (big) 29f else 20f, Tokens.ink, Tokens.weightH()).also {
             it.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
