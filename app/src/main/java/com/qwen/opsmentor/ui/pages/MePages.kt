@@ -1063,7 +1063,7 @@ class PageCourseImport(act: Activity, app: App) : Page(act, app) {
             it.setOnClickListener {
                 (act as MainActivity).pickMedia(kind) { uris ->
                     if (uris.isNullOrEmpty()) { Sheets.toast(ctx, "没有选到可用文件"); return@pickMedia }
-                    val items = MediaCourses.fromUris(ctx, uris, kind)
+                    val items = MediaCourses.sortItems(MediaCourses.fromUris(ctx, uris, kind), sortKey, sortAsc)
                     val id = MediaCourses.createCourse(app, kind, mediaTitle.ifBlank { if (kind == "video") "视频课程" else "语音课程" }, items, glyph)
                     if (id != null) {
                         store.cmTab = kind; store.save()
