@@ -51,6 +51,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     private var playBtn: ImageView? = null
     private var rate = 1f
     private var paused = true
+    private var autoplayOnRender = false
 
     private fun current() = pack.chById(PagePlayer.curCh.ifBlank {
         val b = store.bag()
@@ -122,7 +123,11 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
             val r = hrow(ctx)
             r.setPadding(0, ctx.dp(10f), 0, ctx.dp(10f))
             r.isClickable = true
-            r.setOnClickListener { PagePlayer.curCh = c.id; start(c, true, refreshUi = true) }
+            r.setOnClickListener {
+                PagePlayer.curCh = c.id
+                autoplayOnRender = true
+                rerender(false)
+            }
             val th = FrameLayout(ctx).apply {
                 flat(Tokens.priSoft, ctx.dp(4f).toFloat())
                 layoutParams = LinearLayout.LayoutParams(ctx.dp(52f), ctx.dp(34f))
@@ -146,7 +151,9 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
             listCard.addView(r)
         }
         host.addView(listCard)
-        start(ch, false)
+        val autoplay = autoplayOnRender
+        autoplayOnRender = false
+        start(ch, autoplay)
     }
 
 
@@ -187,7 +194,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         }.getOrDefault(false)
     }
 
-    private fun start(ch: com.qwen.opsmentor.data.Chapter, autoplay: Boolean, refreshUi: Boolean = false) {
+    private fun start(ch: com.qwen.opsmentor.data.Chapter, autoplay: Boolean) {
         val ctx = act
         stopPlayer()
         app.reader?.stop()
@@ -231,8 +238,6 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
             store.bag().pin = ch.id
             store.save()
         }
-        // body() 首次装配播放器时不能再次触发整页重绘，否则会递归创建播放器。
-        if (refreshUi) rerender(false)
     }
 
     private fun duration(): Int = try {
@@ -271,7 +276,9 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         if (idx < 0) return
         val next = (idx + d).coerceIn(0, pack.ch.size - 1)
         PagePlayer.curCh = pack.ch[next].id
-        start(pack.ch[next], true, refreshUi = true)
+        PagePlayer.curCh = pack.ch[next].id
+        autoplayOnRender = true
+        rerender(false)
     }
 
     private var preparedVideoPlayer: MediaPlayer? = null
