@@ -16,6 +16,7 @@ import com.qwen.opsmentor.core.dp
 import com.qwen.opsmentor.core.label
 import com.qwen.opsmentor.core.surface
 import com.qwen.opsmentor.core.flat
+import com.qwen.opsmentor.core.itemIn
 import com.qwen.opsmentor.data.Chapter
 import com.qwen.opsmentor.data.Pack
 import com.qwen.opsmentor.state.Mark
@@ -85,11 +86,17 @@ abstract class Page(val act: Activity, val app: App) {
     }
 
     /** 整页重绘；keepScroll=false 时回顶部（对应 Web 的 __readTop） */
-    fun rerender(toTop: Boolean = false) {
+    fun rerender(toTop: Boolean = false, animateItems: Boolean = false) {
         val box = content ?: return
         box.removeAllViews()
         blocks.clear()
         body(box)
+        // HTML .stagger：页面进入时，一级内容按 30ms 起步错峰浮现。
+        if (animateItems && !Tokens.reducedMotion) {
+            box.children.forEachIndexed { index, child ->
+                child.itemIn((30L + index * 50L).coerceAtMost(390L))
+            }
+        }
         app.registerBlocks(blocks)
         app.reader?.load(readingSegs())
         val key = "$CUR:${posKey()}"
