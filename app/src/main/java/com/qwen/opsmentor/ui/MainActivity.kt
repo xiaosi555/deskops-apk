@@ -67,6 +67,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     private val pages = HashMap<String, Page>()
     private var view = "mine"
     private val navStack = ArrayList<String>()
+    // HTML 中 anno 是「我的划线」的课程直达入口；返回时需同时退出课程筛选层。
+    private var marksDirect = false
     private var topPad = 0
     private var bottomPad = 0
 
@@ -341,16 +343,25 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     }
 
     fun nav(v: String) {
-        if (v in listOf("today", "know", "review", "prog", "play") && pack().ch.isEmpty()) {
+        val target = if (v == "anno") {
+            marksDirect = true
+            val marksPage = pages.getOrPut("my-marks") { PageMarks(this, app) } as PageMarks
+            marksPage.openCourse(app.store.cur)
+            "my-marks"
+        } else {
+            if (v == "my-marks") marksDirect = false
+            v
+        }
+        if (target in listOf("today", "know", "review", "prog", "play") && pack().ch.isEmpty()) {
             Sheets.toast(this, "这门课程还没有章节内容，可通过「课程 → 导入」补充")
             return
         }
-        if (v == view) { render(); return }
-        if (view == "player" && v != "player") leavePlayer()
+        if (target == view) { render(); return }
+        if (view == "player" && target != "player") leavePlayer()
         selectionBar.close()
-        app.reader?.let { if (it.on && v != "today") it.stop() }
-        if (tabs.containsKey(v)) navStack.clear() else navStack.add(view)
-        view = v
+        app.reader?.let { if (it.on && target != "today") it.stop() }
+        if (tabs.containsKey(target)) navStack.clear() else navStack.add(view)
+        view = target
         render()
     }
 
@@ -358,7 +369,13 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         if (selectionBar.isOpen()) { selectionBar.close(); return }
         // 只处理当前页面的嵌套状态；缓存的隐藏页面不能拦截当前路由返回。
         if (view == "my-marks") {
-            (pages["my-marks"] as? PageMarks)?.let { if (it.inCourse()) { it.popCourse(); render(); return } }
+            (pages["my-marks"] as? PageMarks)?.let {
+                if (it.inCourse()) {
+                    it.popCourse()
+                    if (!marksDirect) { render(); return }
+                    marksDirect = false
+                }
+            }
         }
         if (view == "io") {
             (pages["io"] as? PageIo)?.let { if (it.inDetail()) { it.popDetail(); render(); return } }
@@ -373,6 +390,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     }
 
     fun currentView(): String = view
+    fun isDirectMarksPage(): Boolean = view == "my-marks" && marksDirect
     fun stackBase(): String = navStack.firstOrNull() ?: "mine"
     fun pack() = app.currentPack()
 
