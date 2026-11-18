@@ -407,6 +407,8 @@ private fun CourseDetail(
 
 @Composable
 private fun MediaLibrary(media: List<DeskMedia>, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, onPlay: (DeskMedia) -> Unit, onImportFiles: () -> Unit, onImportFolder: () -> Unit, onRemove: (DeskMedia) -> Unit) {
+    var sortByTime by remember { mutableStateOf(false) }
+    val sortedMedia = if (sortByTime) media.sortedByDescending { it.addedAt } else media.sortedBy { it.name.lowercase() }
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(surface).padding(17.dp)) {
@@ -419,9 +421,16 @@ private fun MediaLibrary(media: List<DeskMedia>, modifier: Modifier, fg: Color, 
                 }
             }
         }
-        item { Text("已导入 · ${media.size}", color = fg, fontSize = 17.sp, fontWeight = FontWeight.Bold) }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("已导入 · " + media.size, color = fg, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = { sortByTime = false }) { Text("按名称", color = if (!sortByTime) primary else sub) }
+                TextButton(onClick = { sortByTime = true }) { Text("按时间", color = if (sortByTime) primary else sub) }
+            }
+        }
         if (media.isEmpty()) item { EmptyCard("还没有媒体文件", "选择文件或文件夹导入视频、音频", surface, sub) }
-        items(media, key = { it.uri }) { item ->
+        items(sortedMedia, key = { it.uri }) { item ->
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).background(surface).clickable { onPlay(item) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(primary.copy(alpha = .12f)), contentAlignment = Alignment.Center) { Icon(if (item.mime.startsWith("audio")) Icons.Rounded.Headphones else Icons.Rounded.PlayArrow, null, tint = primary) }
                 Spacer(Modifier.width(12.dp))
