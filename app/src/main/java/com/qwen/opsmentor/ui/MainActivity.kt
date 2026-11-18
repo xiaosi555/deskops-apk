@@ -457,8 +457,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
             val pill = hrow(this)
             pill.surface(Tokens.l2, 24f, 4f, Tokens.planet)
             pill.setPadding(dp(6f), dp(4f), dp(10f), dp(4f))
-            val play = iconBtn(this, "play", "朗读", 32f) { r.toggle(); updateReaderPill() }
-            val stop = iconBtn(this, "close", "停止朗读", 28f) { r.stop(); updateReaderPill() }
+            val play = iconBtn(this, "play", "朗读", 32f) { reader.toggle(); updateReaderPill() }
+            val stop = iconBtn(this, "close", "停止朗读", 28f) { reader.stop(); updateReaderPill() }
             val rate = label(this, "${app.store.ttsRate}×", 12f, Tokens.pri, Tokens.weightM())
             rate.setOnClickListener {
                 Sheets.picker(this, "朗读语速", listOf(
@@ -466,7 +466,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
                     com.qwen.opsmentor.core.Opt("1.25", "较快 · 1.25×"), com.qwen.opsmentor.core.Opt("1.5", "快 · 1.5×"),
                     com.qwen.opsmentor.core.Opt("1.75", "很快 · 1.75×"),
                 ), app.store.ttsRate.toString()) { v, _ ->
-                    r.setRate(v.toFloatOrNull() ?: 1f); rate.text = "${v}×"
+                    reader.setRate(v.toFloatOrNull() ?: 1f); rate.text = "${v}×"
                 }
             }
             pill.addView(play)
@@ -504,7 +504,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     }
 
     override fun onBackPressed() {
-        goBack()
+        if (selectionBar.isOpen() || view != "mine" || navStack.isNotEmpty()) goBack() else super.onBackPressed()
     }
 
     override fun onDestroy() {
