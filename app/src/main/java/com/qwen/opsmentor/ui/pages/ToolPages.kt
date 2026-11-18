@@ -255,7 +255,7 @@ class PageCases(act: Activity, app: App) : Page(act, app) {
         c.addView(row)
         searchField(c, "输入关键词，如 DNS / 打印机 / 4625", kw) { kw = it; rerender(false) }
 
-        draft?.let { host.addView(form(it)) }
+        draft?.let { form(it) }
 
         val list = store.cases.filter {
             kw.isBlank() || listOf(it.no, it.sym, it.path, it.cause, it.lesson, it.ch).joinToString(" ").lowercase().contains(kw.lowercase())
@@ -266,7 +266,7 @@ class PageCases(act: Activity, app: App) : Page(act, app) {
         } else if (list.isEmpty() && draft == null) {
             host.addView(muted(ctx, "没有匹配 \"$kw\" 的案例。"), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(14f) })
         }
-        list.forEach { item -> host.addView(caseItem(item)) }
+        list.forEach { item -> caseItem(item) }
     }
 
     private fun fieldText(label2: String, value: String, multi: Boolean, onChange: (String) -> Unit): View {
