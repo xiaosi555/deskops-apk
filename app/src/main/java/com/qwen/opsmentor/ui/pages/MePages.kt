@@ -761,7 +761,7 @@ class PageSettings(act: Activity, app: App) : Page(act, app) {
         label(ctx, text, if (Tokens.planet) 13f else 15.5f,
             if (Tokens.planet) Tokens.sub else Tokens.ink,
             if (Tokens.planet) 400 else Tokens.weightH()).also {
-            if (Tokens.planet) (it.layoutParams as? LinearLayout.LayoutParams)?.bottomMargin = ctx.dp(14f)
+            if (Tokens.planet) it.setPadding(0, 0, 0, ctx.dp(14f))
         }
 
     private fun trio(items: List<Triple<String, String, String>>, value: String, onPick: (String) -> Unit): View {
