@@ -62,7 +62,8 @@ abstract class Page(val act: Activity, val app: App) {
         val c = act
         val box = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            val pad = c.dp(16f)
+            // HTML 星球版 stage 左右留白 20px；极简版为 16px
+            val pad = c.dp(if (Tokens.planet) 20f else 16f)
             setPadding(pad, 0, pad, c.dp(30f))
         }
         val owner = (c as? ScrollOwner)
@@ -148,7 +149,7 @@ abstract class Page(val act: Activity, val app: App) {
     }
 
     /** 卡片容器 */
-    fun card(host: LinearLayout, padDp: Float = 14f, top: Int = 10): LinearLayout {
+    fun card(host: LinearLayout, padDp: Float = 16f, top: Int = 14): LinearLayout {
         val c = act
         val box = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
