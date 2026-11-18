@@ -131,13 +131,23 @@ class PageCourse(act: Activity, app: App) : Page(act, app) {
         val tabs = hrow(ctx)
         tabs.setPadding(0, ctx.dp(18f), 0, 0)
         listOf("chs" to "章节", "about" to "课程说明", "tools" to "工具箱").forEachIndexed { i, (k, name) ->
-            val b = label(ctx, name + if (k == "tools" && due > 0) "  $due" else "", 15f, if (seg == k) Tokens.pri else Tokens.ink, Tokens.weightH())
-            b.setPadding(0, ctx.dp(10f), 0, ctx.dp(10f))
-            b.isClickable = true
-            b.setOnClickListener { seg = k; rerender(false) }
+            val selected = seg == k
+            val item = vcol(ctx).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                isClickable = true
+                setOnClickListener { seg = k; rerender(false) }
+            }
+            val title = label(ctx, name + if (k == "tools" && due > 0) "  $due" else "", 14.5f,
+                if (selected) Tokens.pri else Tokens.ink, if (selected) Tokens.weightH() else Tokens.weightM())
+            title.setPadding(0, ctx.dp(10f), 0, ctx.dp(8f))
+            item.addView(title)
+            val indicator = View(ctx).apply {
+                flat(if (selected) Tokens.pri else android.graphics.Color.TRANSPARENT, 2f)
+            }
+            item.addView(indicator, LinearLayout.LayoutParams(ctx.dp(24f), ctx.dp(3f)))
             val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             if (i > 0) lp.marginStart = ctx.dp(28f)
-            tabs.addView(b, lp)
+            tabs.addView(item, lp)
         }
         val line = View(ctx).apply { flat(Tokens.hairc, 1f) }
         val wrap = vcol(ctx)
@@ -249,16 +259,23 @@ class PageCourse(act: Activity, app: App) : Page(act, app) {
     private fun tile(ctx: Activity, label2: String, icon: String, badge: Int, onClick: () -> Unit): View {
         val t = vcol(ctx)
         t.gravity = Gravity.CENTER
-        t.flat(if (Tokens.planet) Tokens.l2 else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(Tokens.rInner()))
+        t.minimumHeight = ctx.dp(88f)
+        if (Tokens.planet) {
+            t.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        } else {
+            t.flat(Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(Tokens.rInner()))
+        }
         t.setPadding(0, ctx.dp(12f), 0, ctx.dp(12f))
+        val iconSize = if (Tokens.planet) 27f else 20f
         val box = FrameLayout(ctx)
-        box.addView(Icons.iconView(ctx, icon, Tokens.pri, 20f), FrameLayout.LayoutParams(ctx.dp(20f), ctx.dp(20f)).also { it.gravity = Gravity.CENTER })
+        box.addView(Icons.iconView(ctx, icon, Tokens.pri, iconSize), FrameLayout.LayoutParams(ctx.dp(iconSize), ctx.dp(iconSize)).also { it.gravity = Gravity.CENTER })
         if (badge > 0) box.addView(com.qwen.opsmentor.core.badgeDot(ctx, badge), FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ctx.dp(16f)).also {
             it.gravity = Gravity.TOP or Gravity.END
             it.topMargin = -ctx.dp(4f); it.marginEnd = -ctx.dp(6f)
         })
-        t.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(24f)))
-        t.addView(label(ctx, label2, 12.5f, Tokens.ink, Tokens.weightM()), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
+        t.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(if (Tokens.planet) 30f else 24f)))
+        t.addView(label(ctx, label2, if (Tokens.planet) 14.5f else 12.5f, Tokens.ink, Tokens.weightM()),
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(if (Tokens.planet) 11f else 6f) })
         t.isClickable = true
         t.setOnClickListener { t.animatePop(); onClick() }
         return t
