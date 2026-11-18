@@ -155,61 +155,91 @@ class MiniBar(ctx: Context, private val app: App, private val go: (String) -> Un
     // ---------------- 横滑丢弃手势 ----------------
 
     private var sx = 0f; private var sy = 0f; private var dx = 0f; private var t0 = 0L
+    private var dragLocked = false
 
     private fun bindDrag() {
-        var locked = false
-        inner.setOnTouchListener { v, e ->
-            when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    dragging = true; locked = false; movedFlag = false
-                    sx = e.rawX; sy = e.rawY; dx = 0f; t0 = System.currentTimeMillis()
-                    v.animate().cancel()
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (!dragging) return@setOnTouchListener false
-                    val mx = e.rawX - sx
-                    val my = e.rawY - sy
-                    if (!locked) {
-                        if (Math.abs(mx) > 8 && Math.abs(mx) > Math.abs(my) * 1.2) locked = true
-                        else if (Math.abs(my) > 12) { dragging = false; return@setOnTouchListener false }
-                        else return@setOnTouchListener true
-                    }
-                    dx = mx
-                    movedFlag = true
-                    v.translationX = dx
-                    v.alpha = (1f - Math.abs(dx) / (v.width.coerceAtLeast(1) * 0.9f)).coerceIn(0.12f, 1f)
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    if (!dragging) return@setOnTouchListener false
-                    dragging = false
-                    if (!locked) {
-                        v.performClick()
-                        return@setOnTouchListener false
-                    }
-                    val vel = Math.abs(dx) / Math.max(1L, System.currentTimeMillis() - t0).toFloat()
-                    val wide = width.coerceAtLeast(1)
-                    if (Math.abs(dx) > v.width * 0.3f || (vel > 0.55f && Math.abs(dx) > 28f)) {
-                        val dir = if (dx > 0) 1f else -1f
-                        v.animate().translationX(dir * wide).alpha(0f).setDuration(260)
-                            .setInterpolator(android.view.animation.DecelerateInterpolator()).withEndAction {
-                                gone = true; shownOnce = false
-                                visibility = View.GONE
-                                v.translationX = 0f; v.alpha = 1f
-                            }.start()
-                    } else {
-                        v.animate().translationX(0f).alpha(1f).setDuration(320).setInterpolator(SNAP).start()
-                    }
-                    postDelayed({ movedFlag = false }, 60)
-                    true
-                }
-                else -> false
-            }
-        }
         inner.setOnClickListener {
             if (movedFlag) { movedFlag = false; return@setOnClickListener }
             go("today")
         }
+    }
+
+    // 在整个 MiniBar 容器上拦截横向滑动，而不是只监听 inner。
+    // 这样从封面、播放按钮或队列按钮上起手也能横滑；纵向手势仍交还给子控件。
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                dragging = true
+                dragLocked = false
+                movedFlag = false
+                sx = ev.rawX; sy = ev.rawY; dx = 0f
+                t0 = System.currentTimeMillis()
+                inner.animate().cancel()
+                return false
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (!dragging) return false
+                val mx = ev.rawX - sx
+                val my = ev.rawY - sy
+                if (!dragLocked) {
+                    if (Math.abs(mx) > dp(8f) && Math.abs(mx) > Math.abs(my) * 1.2f) {
+                        dragLocked = true
+                        parent?.requestDisallowInterceptTouchEvent(true)
+                        return true
+                    }
+                    if (Math.abs(my) > dp(12f)) {
+                        dragging = false
+                        return false
+                    }
+                    return false
+                }
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                val intercept = dragLocked
+                if (!intercept) dragging = false
+                return intercept
+            }
+        }
+        return dragLocked
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (!dragLocked) return super.onTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> {
+                dx = event.rawX - sx
+                movedFlag = true
+                inner.translationX = dx
+                inner.alpha = (1f - Math.abs(dx) / (inner.width.coerceAtLeast(1) * 0.9f)).coerceIn(0.12f, 1f)
+            }
+            MotionEvent.ACTION_UP -> {
+                val velocity = Math.abs(dx) / Math.max(1L, System.currentTimeMillis() - t0).toFloat()
+                val threshold = inner.width.coerceAtLeast(1)
+                if (Math.abs(dx) > threshold * 0.3f || (velocity > 0.55f && Math.abs(dx) > dp(28f))) {
+                    val direction = if (dx > 0f) 1f else -1f
+                    inner.animate().translationX(direction * width.coerceAtLeast(1)).alpha(0f)
+                        .setDuration(260L)
+                        .setInterpolator(android.view.animation.DecelerateInterpolator())
+                        .withEndAction {
+                            gone = true; shownOnce = false
+                            visibility = View.GONE
+                            inner.translationX = 0f; inner.alpha = 1f
+                        }.start()
+                } else {
+                    inner.animate().translationX(0f).alpha(1f).setDuration(320L).setInterpolator(SNAP).start()
+                }
+                postDelayed({ movedFlag = false }, 60L)
+                dragging = false
+                dragLocked = false
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                inner.animate().translationX(0f).alpha(1f).setDuration(220L).setInterpolator(SNAP).start()
+                dragging = false
+                dragLocked = false
+                movedFlag = false
+            }
+        }
+        return true
     }
 }
