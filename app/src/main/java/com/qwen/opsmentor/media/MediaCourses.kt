@@ -166,12 +166,13 @@ object MediaCourses {
             val m = c.media ?: return@forEach
             val dst = File(dir(ctx, courseId), c.id + "." + ext(m.fname))
             if (dst.exists()) { done++; return@forEach }
-            runCatching {
-                ctx.contentResolver.openInputStream(Uri.parse(m.uri))?.use { ins ->
-                    dst.outputStream().use { ins.copyTo(it) }
-                }
-                done++
-            }
+            val copied = runCatching {
+                val input = ctx.contentResolver.openInputStream(Uri.parse(m.uri))
+                    ?: throw IllegalStateException("无法打开媒体文件")
+                input.use { ins -> dst.outputStream().use { out -> ins.copyTo(out) } }
+                dst.exists()
+            }.getOrDefault(false)
+            if (copied) done++ else dst.delete()
         }
         return done
     }
