@@ -215,14 +215,19 @@ object MediaCourses {
         val src = resolve(ctx, courseId, ch)
         return runCatching {
             val mmr = android.media.MediaMetadataRetriever()
-            if (src.startsWith("/")) mmr.setDataSource(src) else mmr.setDataSource(ctx, Uri.parse(src))
-            val bmp = mmr.getFrameAtTime(1_000_000L, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-            mmr.release()
-            if (bmp == null) null else {
-                val o = Bitmap.createScaledBitmap(bmp, 360, (360f * bmp.height / bmp.width).toInt().coerceAtLeast(1), true)
-                FileOutputStream(f).use { o.compress(Bitmap.CompressFormat.JPEG, 72, it) }
-                o.recycle(); bmp.recycle()
+            var bmp: Bitmap? = null
+            var scaled: Bitmap? = null
+            try {
+                if (src.startsWith("/")) mmr.setDataSource(src) else mmr.setDataSource(ctx, Uri.parse(src))
+                bmp = mmr.getFrameAtTime(1_000_000L, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                val frame = bmp ?: return@runCatching null
+                scaled = Bitmap.createScaledBitmap(frame, 360, (360f * frame.height / frame.width).toInt().coerceAtLeast(1), true)
+                FileOutputStream(f).use { scaled!!.compress(Bitmap.CompressFormat.JPEG, 72, it) }
                 f
+            } finally {
+                runCatching { mmr.release() }
+                if (scaled !== bmp) runCatching { scaled?.recycle() }
+                runCatching { bmp?.recycle() }
             }
         }.getOrNull()
     }
@@ -238,9 +243,12 @@ object MediaCourses {
                 val src = resolve(ctx, courseId, c)
                 runCatching {
                     val mmr = android.media.MediaMetadataRetriever()
-                    if (src.startsWith("/")) mmr.setDataSource(src) else mmr.setDataSource(ctx, Uri.parse(src))
-                    val d = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                    mmr.release()
+                    val d = try {
+                        if (src.startsWith("/")) mmr.setDataSource(src) else mmr.setDataSource(ctx, Uri.parse(src))
+                        mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                    } finally {
+                        runCatching { mmr.release() }
+                    }
                     if (d > 0) { c.media = m.copy(dur = d / 1000); changed = true }
                 }
             }
