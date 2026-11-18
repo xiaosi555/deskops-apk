@@ -607,7 +607,6 @@ private fun MediaLibrary(media: List<DeskMedia>, modifier: Modifier, fg: Color, 
 @Composable
 private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: Color, primary: Color, initialPositionMs: Long, onSession: (Long, Long) -> Unit) {
     val context = LocalContext.current
-    val startedAt = remember(media.uri) { android.os.SystemClock.elapsedRealtime() }
     val player = remember(media.uri) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(ExoMediaItem.fromUri(Uri.parse(media.uri)))
@@ -616,16 +615,29 @@ private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: C
             playWhenReady = true
         }
     }
+    var playedDurationMs by remember(player) { mutableLongStateOf(0L) }
+    var playbackStartedAt by remember(player) { mutableLongStateOf(if (player.isPlaying) android.os.SystemClock.elapsedRealtime() else 0L) }
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 Toast.makeText(context, "媒体播放失败：" + (error.message ?: "格式不受支持或文件无法读取"), Toast.LENGTH_LONG).show()
             }
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (isPlaying) playbackStartedAt = now
+                else if (playbackStartedAt > 0L) {
+                    playedDurationMs += (now - playbackStartedAt).coerceAtLeast(0L)
+                    playbackStartedAt = 0L
+                }
+            }
         }
         player.addListener(listener)
         onDispose {
+            if (player.isPlaying && playbackStartedAt > 0L) {
+                playedDurationMs += (android.os.SystemClock.elapsedRealtime() - playbackStartedAt).coerceAtLeast(0L)
+            }
             player.removeListener(listener)
-            onSession((android.os.SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L), player.currentPosition)
+            onSession(playedDurationMs, player.currentPosition)
             player.release()
         }
     }
