@@ -356,8 +356,13 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
 
     fun goBack() {
         if (selectionBar.isOpen()) { selectionBar.close(); return }
-        (pages["my-marks"] as? PageMarks)?.let { if (it.inCourse()) { it.popCourse(); render(); return } }
-        (pages["io"] as? PageIo)?.let { if (it.inDetail()) { it.popDetail(); render(); return } }
+        // 只处理当前页面的嵌套状态；缓存的隐藏页面不能拦截当前路由返回。
+        if (view == "my-marks") {
+            (pages["my-marks"] as? PageMarks)?.let { if (it.inCourse()) { it.popCourse(); render(); return } }
+        }
+        if (view == "io") {
+            (pages["io"] as? PageIo)?.let { if (it.inDetail()) { it.popDetail(); render(); return } }
+        }
         selectionBar.close()
         val next = if (navStack.isNotEmpty()) navStack.removeAt(navStack.size - 1) else "mine"
         if (view == "player" && next != "player") leavePlayer()
