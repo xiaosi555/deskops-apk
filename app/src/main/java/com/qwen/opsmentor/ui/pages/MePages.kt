@@ -12,6 +12,7 @@ import android.widget.LinearLayout
 import com.qwen.opsmentor.App
 import com.qwen.opsmentor.core.AnnotatedText
 import com.qwen.opsmentor.ui.Bars
+import com.qwen.opsmentor.ui.Rows
 import com.qwen.opsmentor.core.Covers
 import com.qwen.opsmentor.core.Icons
 import com.qwen.opsmentor.core.Opt
@@ -585,8 +586,8 @@ class PageSettings(act: Activity, app: App) : Page(act, app) {
     override fun body(host: LinearLayout) {
         val ctx = act
         // 主题色
-        val c1 = card(host, 16f, 12)
-        c1.addView(label(ctx, "主题色", 15.5f, Tokens.ink, Tokens.weightH()))
+        val c1 = settingsSection(host, 12)
+        c1.addView(settingsTitle(ctx, "主题色"))
         val grid = vcol(ctx)
         var row = hrow(ctx)
         c1.addView(grid, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) })
@@ -650,33 +651,51 @@ class PageSettings(act: Activity, app: App) : Page(act, app) {
         customRow.addView(customCol, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         repeat(2) { customRow.addView(View(ctx), LinearLayout.LayoutParams(0, 1, 1f).also { it.marginStart = ctx.dp(4f) }) }
         // 外观
-        val c2 = card(host, 16f, 10)
-        c2.addView(label(ctx, "外观", 15.5f, Tokens.ink, Tokens.weightH()))
-        c2.addView(trio(listOf(
-            Triple("system", "跟随系统", "auto"), Triple("light", "亮色", "sun"), Triple("dark", "暗色", "moon"),
-        ), when (store.appearance) {
-            Appearance.SYSTEM -> "system"; Appearance.LIGHT -> "light"; Appearance.DARK -> "dark"
-        }) { v ->
-            store.appearance = when (v) {
-                "light" -> Appearance.LIGHT; "dark" -> Appearance.DARK; else -> Appearance.SYSTEM
-            }
-            store.theme = if (v == "dark") "dark" else "light"
+        val c2 = settingsSection(host, 10)
+        c2.addView(settingsTitle(ctx, "外观"))
+        val appearanceRow = hrow(ctx)
+        appearanceRow.addView(label(ctx, "夜间模式", 15f, Tokens.ink, Tokens.weightM()),
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val darkSwitch = FrameLayout(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams(ctx.dp(46f), ctx.dp(26f))
+        }
+        fun paintDarkSwitch() {
+            val enabled = Tokens.dark
+            darkSwitch.flat(if (enabled) Tokens.pri else Tokens.withAlpha(Tokens.sub, 0.25f), ctx.dp(13f).toFloat())
+            darkSwitch.removeAllViews()
+            darkSwitch.addView(View(ctx).apply { flat(0xFFFFFFFF.toInt(), ctx.dp(10f).toFloat()) },
+                FrameLayout.LayoutParams(ctx.dp(20f), ctx.dp(20f)).also {
+                    it.gravity = if (enabled) Gravity.END else Gravity.START
+                    it.marginStart = ctx.dp(3f); it.marginEnd = ctx.dp(3f)
+                })
+        }
+        paintDarkSwitch()
+        darkSwitch.isClickable = true
+        darkSwitch.setOnClickListener {
+            store.appearance = if (Tokens.dark) Appearance.LIGHT else Appearance.DARK
+            store.theme = if (Tokens.dark) "light" else "dark"
             store.save(); app.retheme(); rerender(false)
-        })
+        }
+        appearanceRow.addView(darkSwitch)
+        c2.addView(appearanceRow)
         // 主题风格
-        val c3 = card(host, 16f, 10)
-        c3.addView(label(ctx, "主题", 15.5f, Tokens.ink, Tokens.weightH()))
-        c3.addView(trio(listOf(
-            Triple("minimal", "极简版", "克制、留白、轻量层级"),
-            Triple("planet", "星球版", "播客式大标题与封面列表"),
-        ), if (store.style == StyleMode.PLANET) "planet" else "minimal") { v ->
-            store.style = if (v == "minimal") StyleMode.MINIMAL else StyleMode.PLANET
+        val c3 = settingsSection(host, 10)
+        c3.addView(settingsTitle(ctx, "主题"))
+        c3.addView(Rows.list(ctx, "leaf", "极简版", "保持克制、留白与轻量层级",
+            if (store.style == StyleMode.MINIMAL) "使用中" else "") {
+            store.style = StyleMode.MINIMAL
             store.save(); app.retheme(); rerender(false)
-            Sheets.toast(ctx, if (v == "planet") "已切换星球版" else "已切换极简版")
+            Sheets.toast(ctx, "已切换极简版")
+        })
+        c3.addView(Rows.list(ctx, "orbit", "星球版", "播客式内容流：大标题、封面列表、进度播放条",
+            if (store.style == StyleMode.PLANET) "使用中" else "") {
+            store.style = StyleMode.PLANET
+            store.save(); app.retheme(); rerender(false)
+            Sheets.toast(ctx, "已切换星球版")
         })
         // 顶部装饰
-        val c4 = card(host, 16f, 10)
-        c4.addView(label(ctx, "顶部装饰", 15.5f, Tokens.ink, Tokens.weightH()))
+        val c4 = settingsSection(host, 10)
+        c4.addView(settingsTitle(ctx, "顶部装饰"))
         val dg = vcol(ctx)
         DECOS.chunked(4).forEach { row ->
             val r = hrow(ctx)
@@ -695,7 +714,7 @@ class PageSettings(act: Activity, app: App) : Page(act, app) {
         }
         c4.addView(dg)
         // 状态栏留白
-        val c5 = card(host, 16f, 10)
+        val c5 = settingsSection(host, 10)
         val sw = hrow(ctx)
         val swTitle = label(ctx, "顶部状态栏留白", 15f, Tokens.ink, Tokens.weightM())
         swTitle.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -720,7 +739,30 @@ class PageSettings(act: Activity, app: App) : Page(act, app) {
         c5.addView(sw)
         c5.addView(muted(ctx, "关闭后内容顶到状态栏下，适合全面屏沉浸式阅读；系统状态栏图标对比度会自动调整。"),
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) })
+
+        val c6 = settingsSection(host, 10)
+        c6.addView(settingsTitle(ctx, "数据"))
+        c6.addView(Rows.list(ctx, "database", "数据", "课程、学习手册、划线、进度、案例与术语", "") {
+            (act as? MainActivity)?.nav("io")
+        })
     }
+
+    private fun settingsSection(host: LinearLayout, top: Int): LinearLayout {
+        if (!Tokens.planet) return card(host, 16f, top)
+        return vcol(act).also { panel ->
+            panel.layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).also { it.bottomMargin = act.dp(34f) }
+            host.addView(panel)
+        }
+    }
+
+    private fun settingsTitle(ctx: Activity, text: String): View =
+        label(ctx, text, if (Tokens.planet) 13f else 15.5f,
+            if (Tokens.planet) Tokens.sub else Tokens.ink,
+            if (Tokens.planet) 400 else Tokens.weightH()).also {
+            if (Tokens.planet) (it.layoutParams as? LinearLayout.LayoutParams)?.bottomMargin = ctx.dp(14f)
+        }
 
     private fun trio(items: List<Triple<String, String, String>>, value: String, onPick: (String) -> Unit): View {
         val ctx = act
