@@ -49,7 +49,11 @@ class PageMarks(act: Activity, app: App) : Page(act, app) {
     private var selected = ""
     private val checked = HashSet<String>()
 
+    override val learning: Boolean
+        get() = (act as? MainActivity)?.isDirectMarksPage() == true
+
     fun inCourse() = selected.isNotEmpty()
+    fun openCourse(courseId: String) { selected = courseId; checked.clear() }
     fun popCourse() { selected = ""; checked.clear() }
 
     override fun body(host: LinearLayout) {
