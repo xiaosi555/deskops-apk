@@ -36,36 +36,56 @@ object MediaCourses {
     fun isMedia(name: String, kind: String): Boolean =
         ext(name) in (if (kind == "video") VIDEO_EXT else AUDIO_EXT)
 
-    /** 扫描文件夹（一层 + 递归一层常见子目录） */
+    /** 扫描文件夹：读取根目录及其下一层常见子目录，避免深层目录造成超长等待。 */
     fun scan(ctx: Context, tree: Uri, kind: String): List<MediaItem> {
         val out = ArrayList<MediaItem>()
-        val base = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-        val cur = ctx.contentResolver.query(base, arrayOf(
+        val visited = HashSet<String>()
+        val projection = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
             DocumentsContract.Document.COLUMN_SIZE,
             DocumentsContract.Document.COLUMN_LAST_MODIFIED,
             DocumentsContract.Document.COLUMN_MIME_TYPE,
-        ), null, null, null)
-        cur?.use { c ->
-            val iName = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-            val iSize = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE)
-            val iTime = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-            val iMime = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
-            val iId = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-            while (c.moveToNext()) {
-                val name = c.getString(iName) ?: continue
-                val mime = c.getString(iMime) ?: ""
-                val isDir = DocumentsContract.Document.MIME_TYPE_DIR == mime
-                if (isDir) continue
-                if (!isMedia(name, kind) && !(kind == "video" && mime.startsWith("video/")) && !(kind == "audio" && mime.startsWith("audio/"))) continue
-                out.add(MediaItem(
-                    DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(iId)),
-                    name, c.getLong(iSize), c.getLong(iTime), kind,
-                ))
+        )
+
+        fun scanDirectory(parentId: String, depth: Int) {
+            if (!visited.add(parentId)) return
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId)
+            runCatching {
+                ctx.contentResolver.query(children, projection, null, null, null)?.use { c ->
+                    val iId = c.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                    val iName = c.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                    val iSize = c.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                    val iTime = c.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                    val iMime = c.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                    if (iId < 0 || iName < 0 || iMime < 0) return@use
+
+                    while (c.moveToNext()) {
+                        val documentId = c.getString(iId) ?: continue
+                        val name = c.getString(iName) ?: continue
+                        val mime = if (iMime >= 0) c.getString(iMime).orEmpty() else ""
+                        if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                            // 根目录下的一层子目录也纳入扫描；不无限递归，避免误扫大型媒体库。
+                            if (depth < 1) scanDirectory(documentId, depth + 1)
+                            continue
+                        }
+                        val matchesMime = (kind == "video" && mime.startsWith("video/")) ||
+                            (kind == "audio" && mime.startsWith("audio/"))
+                        if (!isMedia(name, kind) && !matchesMime) continue
+                        out.add(MediaItem(
+                            DocumentsContract.buildDocumentUriUsingTree(tree, documentId),
+                            name,
+                            if (iSize >= 0) c.getLong(iSize) else 0L,
+                            if (iTime >= 0) c.getLong(iTime) else 0L,
+                            kind,
+                        ))
+                    }
+                }
             }
         }
-        return sortItems(out, "name", true)
+
+        runCatching { scanDirectory(DocumentsContract.getTreeDocumentId(tree), 0) }
+        return sortItems(out.distinctBy { it.uri.toString() }, "name", true)
     }
 
     fun fromUris(ctx: Context, uris: List<Uri>, kind: String): List<MediaItem> =
