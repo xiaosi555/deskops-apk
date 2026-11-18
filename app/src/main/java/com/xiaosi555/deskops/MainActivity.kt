@@ -111,6 +111,7 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
     var selectedCourse by remember { mutableStateOf<Course?>(null) }
     var activeCourseId by remember { mutableLongStateOf(0L) }
     var activeChapterId by remember { mutableLongStateOf(0L) }
+    var activeResumePosition by remember { mutableLongStateOf(0L) }
     var showAddCourse by remember { mutableStateOf(false) }
     var showChapterEditor by remember { mutableStateOf(false) }
     var editingChapter by remember { mutableStateOf<Chapter?>(null) }
@@ -233,8 +234,14 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
         ) { padding ->
             when {
                 page == "player" && selectedMedia != null -> NativePlayer(
-                    selectedMedia!!, Modifier.padding(padding), fg, sub, primary,
-                    onSession = { duration ->
+                    selectedMedia!!, Modifier.padding(padding), fg, sub, primary, activeResumePosition,
+                    onSession = { duration, position ->
+                        if (activeCourseId != 0L) {
+                            courses.firstOrNull { it.id == activeCourseId }?.let { course ->
+                                val updated = course.copy(chapterItems = course.chapterItems.map { if (it.id == activeChapterId) it.copy(lastPositionMs = position) else it })
+                                persistCourse(updated)
+                            }
+                        }
                         if (duration >= 5000L) {
                             val day = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(java.util.Date())
                             sessions.add(StudySession(System.currentTimeMillis(), activeCourseId, activeChapterId, duration, day))
@@ -253,7 +260,9 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                     },
                     onDeleteChapter = { ch -> persistCourse(selectedCourse!!.copy(chapters = (selectedCourse!!.chapterItems.size - 1).coerceAtLeast(0), chapterItems = selectedCourse!!.chapterItems.filterNot { it.id == ch.id })) },
                     onPlayMedia = { uri, chapterId -> media.firstOrNull { it.uri == uri }?.let {
-                        selectedMedia = it; activeCourseId = selectedCourse!!.id; activeChapterId = chapterId; page = "player"
+                        selectedMedia = it; activeCourseId = selectedCourse!!.id; activeChapterId = chapterId
+                        activeResumePosition = selectedCourse!!.chapterItems.firstOrNull { ch -> ch.id == chapterId }?.lastPositionMs ?: 0L
+                        page = "player"
                     } },
                     onSaveHighlight = { ch ->
                         if (ch.content.isNotBlank()) {
@@ -267,7 +276,7 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                 page == "root" -> when(tab) {
                     "学习" -> LearningHome(courses, media, sessions, Modifier.padding(padding), fg, sub, surface, primary) { c -> selectedCourse = c; page = "course" }
                     "课程" -> CourseList(courses, Modifier.padding(padding), fg, sub, surface, primary, onOpen = { selectedCourse = it; page = "course" }, onAdd = { showAddCourse = true })
-                    "媒体" -> MediaLibrary(media, Modifier.padding(padding), fg, sub, surface, primary, onPlay = { activeCourseId = 0L; activeChapterId = 0L; selectedMedia = it; page = "player" }, onImportFiles = { mediaPicker.launch(arrayOf("video/*", "audio/*")) }, onImportFolder = { folderPicker.launch(null) }, onRemove = { item -> media.remove(item); prefs.edit().putString("media", writeMedia(media)).apply() })
+                    "媒体" -> MediaLibrary(media, Modifier.padding(padding), fg, sub, surface, primary, onPlay = { activeCourseId = 0L; activeChapterId = 0L; activeResumePosition = 0L; selectedMedia = it; page = "player" }, onImportFiles = { mediaPicker.launch(arrayOf("video/*", "audio/*")) }, onImportFolder = { folderPicker.launch(null) }, onRemove = { item -> media.remove(item); prefs.edit().putString("media", writeMedia(media)).apply() })
                     else -> SettingsScreen(themeChoice, darkMode, Modifier.padding(padding), fg, sub, surface, primary,
                         onTheme = { themeChoice = it; prefs.edit().putInt("theme", it).apply() },
                         onDark = { darkMode = it; prefs.edit().putBoolean("dark", it).apply() },
@@ -499,17 +508,18 @@ private fun MediaLibrary(media: List<DeskMedia>, modifier: Modifier, fg: Color, 
 }
 
 @Composable
-private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: Color, primary: Color, onSession: (Long) -> Unit) {
+private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: Color, primary: Color, initialPositionMs: Long, onSession: (Long, Long) -> Unit) {
     val context = LocalContext.current
     val startedAt = remember(media.uri) { android.os.SystemClock.elapsedRealtime() }
     val player = remember(media.uri) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(ExoMediaItem.fromUri(Uri.parse(media.uri)))
             prepare()
+            if (initialPositionMs > 0L) seekTo(initialPositionMs)
             playWhenReady = true
         }
     }
-    DisposableEffect(player) { onDispose { onSession((android.os.SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L)); player.release() } }
+    DisposableEffect(player) { onDispose { onSession((android.os.SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L), player.currentPosition); player.release() } }
     Column(modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, update = { it.player = player }, modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f))
         Column(Modifier.fillMaxWidth().background(Color(0xFF171923)).padding(18.dp)) {
