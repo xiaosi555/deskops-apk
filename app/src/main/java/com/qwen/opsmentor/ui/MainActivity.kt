@@ -225,13 +225,17 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         abEdit = iconBtn(this, "more", getString(R.string.cd_edit), 36f) { CourseEditor.open(this, app, currentCourse()) }
         abin.addView(abEdit)
         appbar.addView(abin, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56f)))
-        root.addView(appbar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.gravity = Gravity.TOP })
+        root.addView(appbar, FrameLayout.LayoutParams(contentWidth(), ViewGroup.LayoutParams.WRAP_CONTENT).also {
+            it.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        })
 
         tabbar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         tabbarLine = View(this)
         tabbar.addView(tabbarLine, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1f)))
         tabBarInner = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        tabbar.addView(tabBarInner, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(60f)))
+        tabbar.addView(tabBarInner, LinearLayout.LayoutParams(contentWidth(), dp(60f)).also {
+            it.gravity = Gravity.CENTER_HORIZONTAL
+        })
         root.addView(tabbar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.gravity = Gravity.BOTTOM })
 
         mini = MiniBar(this, app) { nav(it) }
@@ -266,9 +270,14 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
 
     private fun currentCourse() = Courses.find(app.store, app.store.cur)
 
+    /** HTML .app / .stage 的 640px 最大内容宽度，手机全宽、平板居中。 */
+    private fun contentWidth(): Int = minOf(resources.displayMetrics.widthPixels, dp(640f))
+
     private fun layoutStage() {
         val onTab = tabs.containsKey(view)
         val lp = stage.layoutParams as FrameLayout.LayoutParams
+        lp.width = contentWidth()
+        lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
         lp.topMargin = if (onTab) 0 else topPad + dp(56f)
         lp.bottomMargin = dp(60f) + bottomPad
         stage.layoutParams = lp
