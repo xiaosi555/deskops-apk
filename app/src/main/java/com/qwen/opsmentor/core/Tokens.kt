@@ -90,7 +90,7 @@ object Tokens {
             sub = 0xFF898C91.toInt()
             priSoft = mix(0xFFFFFFFF.toInt(), pri, 0.06f)
             accentWash = 0xFFF3F3F3.toInt()
-            accentLine = 0xFFDDE4DF.toInt()
+            accentLine = mix(0xFFFFFFFF.toInt(), pri, 0.34f)
             hairc = 0x12000000
         } else {
             // HTML 极简版深色主题
