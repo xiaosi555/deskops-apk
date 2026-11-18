@@ -91,6 +91,15 @@ abstract class Page(val act: Activity, val app: App) {
     /** 整页重绘；keepScroll=false 时回顶部（对应 Web 的 __readTop） */
     fun rerender(toTop: Boolean = false, animateItems: Boolean = false) {
         val box = content ?: return
+        // 搜索框等输入控件会在 TextWatcher 中触发重绘。记录焦点路径与光标，
+        // 避免每输入一个字符就销毁输入框，导致键盘失焦、搜索无法连续输入。
+        val focusedInput = box.findFocus() as? android.widget.EditText
+        val focusPath = focusedInput?.let { childPath(box, it) }
+        val selectionStart = focusedInput?.selectionStart ?: -1
+        val selectionEnd = focusedInput?.selectionEnd ?: -1
+        val imm = act.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+        val restoreIme = focusedInput != null && imm?.isAcceptingText == true
+
         box.removeAllViews()
         blocks.clear()
         body(box)
@@ -109,7 +118,41 @@ abstract class Page(val act: Activity, val app: App) {
             store.readPos[key] = 0
             0
         } else (store.readPos[key] ?: lastY)
-        box.post { scroll?.scrollTo(0, y.coerceAtLeast(0)) }
+        box.post {
+            scroll?.scrollTo(0, y.coerceAtLeast(0))
+            val target = focusPath?.let { viewAtPath(box, it) } as? android.widget.EditText
+            if (target != null) {
+                target.requestFocus()
+                val end = target.text?.length ?: 0
+                if (selectionStart >= 0 && selectionEnd >= 0) {
+                    target.setSelection(selectionStart.coerceAtMost(end), selectionEnd.coerceAtMost(end))
+                }
+                if (restoreIme) target.post { imm?.showSoftInput(target, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT) }
+            }
+        }
+    }
+
+    private fun childPath(root: ViewGroup, target: View): IntArray? {
+        val reversed = ArrayList<Int>()
+        var current: View = target
+        while (current !== root) {
+            val parent = current.parent as? ViewGroup ?: return null
+            val index = parent.indexOfChild(current)
+            if (index < 0) return null
+            reversed.add(index)
+            current = parent
+        }
+        return reversed.asReversed().toIntArray()
+    }
+
+    private fun viewAtPath(root: ViewGroup, path: IntArray): View? {
+        var current: View = root
+        for (index in path) {
+            val parent = current as? ViewGroup ?: return null
+            if (index !in 0 until parent.childCount) return null
+            current = parent.getChildAt(index)
+        }
+        return current
     }
 
     val CUR: String get() = store.cur
