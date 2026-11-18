@@ -182,12 +182,12 @@ class MiniBar(ctx: Context, private val app: App, private val go: (String) -> Un
                 val mx = ev.rawX - sx
                 val my = ev.rawY - sy
                 if (!dragLocked) {
-                    if (Math.abs(mx) > dp(8f) && Math.abs(mx) > Math.abs(my) * 1.2f) {
+                    if (Math.abs(mx) > context.dp(8f) && Math.abs(mx) > Math.abs(my) * 1.2f) {
                         dragLocked = true
                         parent?.requestDisallowInterceptTouchEvent(true)
                         return true
                     }
-                    if (Math.abs(my) > dp(12f)) {
+                    if (Math.abs(my) > context.dp(12f)) {
                         dragging = false
                         return false
                     }
@@ -216,7 +216,7 @@ class MiniBar(ctx: Context, private val app: App, private val go: (String) -> Un
             MotionEvent.ACTION_UP -> {
                 val velocity = Math.abs(dx) / Math.max(1L, System.currentTimeMillis() - t0).toFloat()
                 val threshold = inner.width.coerceAtLeast(1)
-                if (Math.abs(dx) > threshold * 0.3f || (velocity > 0.55f && Math.abs(dx) > dp(28f))) {
+                if (Math.abs(dx) > threshold * 0.3f || (velocity > 0.55f && Math.abs(dx) > context.dp(28f))) {
                     val direction = if (dx > 0f) 1f else -1f
                     inner.animate().translationX(direction * width.coerceAtLeast(1)).alpha(0f)
                         .setDuration(260L)
