@@ -441,3 +441,13 @@ rep("ui/MainActivity.kt", [
      "    override fun onBackPressed() {\\n        if (selectionBar.isOpen() || view != \"mine\" || navStack.isNotEmpty()) goBack() else super.onBackPressed()\\n    }")
 ])
 print("Back navigation lint fix complete.")
+
+
+# Apply the back-navigation fix using real line separators (safe on repeated runs).
+def fix_back_navigation(s):
+    nl = chr(10)
+    old = "    override fun onBackPressed() {" + nl + "        goBack()" + nl + "    }"
+    new = "    override fun onBackPressed() {" + nl + "        if (selectionBar.isOpen() || view != \"mine\" || navStack.isNotEmpty()) goBack() else super.onBackPressed()" + nl + "    }"
+    return s.replace(old, new)
+edit("ui/MainActivity.kt", fix_back_navigation)
+print("Back navigation fix applied.")
