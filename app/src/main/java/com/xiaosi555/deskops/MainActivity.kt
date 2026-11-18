@@ -167,7 +167,7 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
             try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
             val name = queryDisplayName(context, uri) ?: "媒体文件"
             val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
-            if (media.none { it.uri == uri.toString() }) media.add(DeskMedia(uri.toString(), name, mime))
+            if (media.none { it.uri == uri.toString() }) media.add(DeskMedia(uri.toString(), name, mime, addedAt = queryLastModified(context, uri)))
         }
         prefs.edit().putString("media", writeMedia(media)).apply()
         if (uris.isNotEmpty()) Toast.makeText(context, "已添加 ${uris.size} 个媒体文件", Toast.LENGTH_SHORT).show()
@@ -186,7 +186,7 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                         val name = f.name ?: "媒体文件"
                         val ext = name.substringAfterLast('.', "").lowercase()
                         if (mime.startsWith("video/") || mime.startsWith("audio/") || ext in listOf("mp4","mkv","mov","webm","3gp","avi","mp3","m4a","aac","wav","flac","ogg","opus")) {
-                            found.add(DeskMedia(f.uri.toString(), name, mime, dir.name ?: ""))
+                            found.add(DeskMedia(f.uri.toString(), name, mime, dir.name ?: "", f.lastModified().takeIf { it > 0L } ?: System.currentTimeMillis()))
                         }
                     }
                 }
@@ -420,10 +420,10 @@ private fun LearningHome(courses: List<Course>, media: List<DeskMedia>, sessions
             }
         }
         item { StudyCalendarCard(sessions, surface, fg, sub, primary) }
-        item { SectionTitle("继续学习", "查看全部", fg) }
+        item { SectionTitle("继续学习", fg) }
         if (courses.isEmpty()) item { EmptyCard("还没有课程", "创建课程，整理你的学习内容", surface, sub) }
         items(courses.take(4)) { c -> CourseCard(c, surface, fg, sub, primary) { open(c) } }
-        item { SectionTitle("最近导入", "媒体库", fg) }
+        item { SectionTitle("最近导入", fg) }
         if (media.isEmpty()) item { EmptyCard("媒体资料库为空", "导入视频或音频，开始离线学习", surface, sub) }
         items(media.take(3)) { m -> Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(surface).padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(if (m.mime.startsWith("audio")) Icons.Rounded.Headphones else Icons.Rounded.PlayCircle, null, tint = primary); Spacer(Modifier.width(12.dp)); Column { Text(m.name, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(m.mime, color = sub, fontSize = 12.sp) } } }
     }
@@ -733,7 +733,7 @@ private fun StudyCalendarCard(sessions: List<StudySession>, surface: Color, fg: 
 }
 
 @Composable
-private fun SectionTitle(title: String, action: String, fg: Color) { Row(verticalAlignment = Alignment.CenterVertically) { Text(title, color = fg, fontWeight = FontWeight.Bold, fontSize = 18.sp); Spacer(Modifier.weight(1f)); Text(action, color = Color.Gray, fontSize = 12.sp) } }
+private fun SectionTitle(title: String, fg: Color) { Text(title, color = fg, fontWeight = FontWeight.Bold, fontSize = 18.sp) }
 @Composable
 private fun StatText(label: String, value: String) { Column { Text(value, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold); Text(label, color = Color.White.copy(alpha = .75f), fontSize = 12.sp) } }
 @Composable
@@ -742,6 +742,14 @@ private fun EmptyCard(title: String, detail: String, surface: Color, sub: Color)
 private fun isAudioMedia(item: DeskMedia): Boolean {
     val ext = item.name.substringAfterLast('.', "").lowercase()
     return item.mime.startsWith("audio/") || ext in setOf("mp3", "m4a", "aac", "wav", "flac", "ogg", "opus", "wma")
+}
+
+private fun queryLastModified(context: android.content.Context, uri: Uri): Long {
+    return runCatching {
+        context.contentResolver.query(uri, arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getLong(0) else System.currentTimeMillis()
+        } ?: System.currentTimeMillis()
+    }.getOrDefault(System.currentTimeMillis())
 }
 
 private fun queryDisplayName(context: android.content.Context, uri: Uri): String? {
