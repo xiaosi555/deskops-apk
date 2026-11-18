@@ -1,0 +1,15 @@
+<resources>
+    <color name="l0_light">#FFEFF3F0</color>
+    <color name="l1_light">#FFF3F6F4</color>
+    <color name="l2_light">#FFF9FBFA</color>
+    <color name="l3_light">#FFFDFEFD</color>
+    <color name="l0_dark">#FF111512</color>
+    <color name="l1_dark">#FF151A16</color>
+    <color name="l2_dark">#FF1A201B</color>
+    <color name="l3_dark">#FF1F2621</color>
+    <color name="ink_light">#FF1E242C</color>
+    <color name="ink_dark">#FFDFE5EE</color>
+    <color name="sub_light">#FF69737F</color>
+    <color name="sub_dark">#FF8F9AA8</color>
+    <color name="pri_default">#FF628B72</color>
+</resources>

@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">桌面课程</string>
+    <string name="tab_course">课程</string>
+    <string name="tab_mine">我的</string>
+    <string name="cd_back">返回</string>
+    <string name="cd_edit">编辑课程</string>
+    <string name="cd_more">更多</string>
+</resources>
