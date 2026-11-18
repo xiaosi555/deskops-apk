@@ -273,7 +273,11 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                             Toast.makeText(context, "已保存本章摘录", Toast.LENGTH_SHORT).show()
                         } else Toast.makeText(context, "本章暂无正文可保存", Toast.LENGTH_SHORT).show()
                     },
-                    highlights = highlights.filter { it.courseId == selectedCourse!!.id }
+                    highlights = highlights.filter { it.courseId == selectedCourse!!.id },
+                    onDeleteHighlight = { item ->
+                        highlights.removeAll { it.id == item.id }
+                        prefs.edit().putString("highlights", LearningDataCodec.encodeHighlights(highlights)).apply()
+                    }
                 )
                 page == "root" -> when(tab) {
                     "学习" -> LearningHome(courses, media, sessions, Modifier.padding(padding), fg, sub, surface, primary) { c -> selectedCourse = c; page = "course" }
@@ -463,7 +467,7 @@ private fun CourseDetail(
     course: Course, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color,
     speak: (String) -> Unit, onAddChapter: () -> Unit, onEditChapter: (Chapter) -> Unit,
     onToggleChapter: (Chapter) -> Unit, onDeleteChapter: (Chapter) -> Unit, onPlayMedia: (String, Long) -> Unit,
-    onSaveHighlight: (Chapter) -> Unit, highlights: List<Highlight>
+    onSaveHighlight: (Chapter) -> Unit, highlights: List<Highlight>, onDeleteHighlight: (Highlight) -> Unit
 ) {
     var expandedChapter by remember { mutableStateOf<Long?>(null) }
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -519,9 +523,12 @@ private fun CourseDetail(
                 Text("本课程摘录", color = fg, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
             items(highlights.sortedByDescending { it.createdAt }, key = { it.id }) { highlight ->
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(surface).padding(15.dp)) {
-                    Text(highlight.text, color = fg, maxLines = 5, overflow = TextOverflow.Ellipsis, lineHeight = 22.sp)
-                    Text(java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(java.util.Date(highlight.createdAt)), color = sub, fontSize = 11.sp)
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(surface).padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(highlight.text, color = fg, maxLines = 5, overflow = TextOverflow.Ellipsis, lineHeight = 22.sp)
+                        Text(java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(java.util.Date(highlight.createdAt)), color = sub, fontSize = 11.sp)
+                    }
+                    IconButton(onClick = { onDeleteHighlight(highlight) }) { Icon(Icons.Rounded.DeleteOutline, "删除摘录", tint = sub) }
                 }
             }
         }
