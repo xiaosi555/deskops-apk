@@ -42,6 +42,13 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Validate original HTML and Android bridge
+        run: |
+          test -s app/src/main/assets/index.html
+          test -s app/src/main/assets/android-bridge.js
+          grep -q '<title>桌面运维全能学习导师</title>' app/src/main/assets/index.html
+          node --check app/src/main/assets/android-bridge.js
+
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
