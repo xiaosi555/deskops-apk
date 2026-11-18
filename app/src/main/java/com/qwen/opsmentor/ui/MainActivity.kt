@@ -167,7 +167,19 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     }
 
     /** 顶栏 / 页面外部刷新入口（供设置页等直接调用） */
-    fun refresh() = render()
+    fun refresh() {
+        val bars = ViewCompat.getRootWindowInsets(root)?.getInsets(WindowInsetsCompat.Type.systemBars())
+        if (bars != null) {
+            topPad = if (app.store.topInset) bars.top else 0
+            bottomPad = bars.bottom
+            appbar.setPadding(0, topPad, 0, 0)
+        } else if (!app.store.topInset) {
+            topPad = 0
+            appbar.setPadding(0, 0, 0, 0)
+        }
+        layoutStage()
+        render()
+    }
 
     fun pickImage(size: Int, cb: (String) -> Unit) {
         pendingPick = size to cb
