@@ -94,6 +94,11 @@ private fun DeskOpsApp(speak: (String) -> Unit) {
     var selectedMedia by remember { mutableStateOf<DeskMedia?>(null) }
     var selectedCourse by remember { mutableStateOf<Course?>(null) }
     var showAddCourse by remember { mutableStateOf(false) }
+    var showChapterEditor by remember { mutableStateOf(false) }
+    var editingChapter by remember { mutableStateOf<Chapter?>(null) }
+    var chapterTitle by remember { mutableStateOf("") }
+    var chapterContent by remember { mutableStateOf("") }
+    var chapterMediaUri by remember { mutableStateOf("") }
     var courseTitle by remember { mutableStateOf("") }
     var courseIntro by remember { mutableStateOf("") }
     var themeChoice by remember { mutableIntStateOf(prefs.getInt("theme", 0)) }
@@ -141,6 +146,13 @@ private fun DeskOpsApp(speak: (String) -> Unit) {
         }
     }
 
+    fun persistCourse(updated: Course) {
+        val index = courses.indexOfFirst { it.id == updated.id }
+        if (index >= 0) courses[index] = updated
+        selectedCourse = updated
+        prefs.edit().putString("courses", writeCourses(courses)).apply()
+    }
+
     BackHandler(enabled = page != "root") {
         if (page == "player") selectedMedia = null
         page = "root"
@@ -172,7 +184,18 @@ private fun DeskOpsApp(speak: (String) -> Unit) {
         ) { padding ->
             when {
                 page == "player" && selectedMedia != null -> NativePlayer(selectedMedia!!, Modifier.padding(padding), fg, sub, primary)
-                page == "course" && selectedCourse != null -> CourseDetail(selectedCourse!!, Modifier.padding(padding), fg, sub, surface, primary, speak)
+                page == "course" && selectedCourse != null -> CourseDetail(
+                    selectedCourse!!, Modifier.padding(padding), fg, sub, surface, primary, speak,
+                    onAddChapter = { editingChapter = null; chapterTitle = ""; chapterContent = ""; chapterMediaUri = ""; showChapterEditor = true },
+                    onEditChapter = { ch -> editingChapter = ch; chapterTitle = ch.title; chapterContent = ch.content; chapterMediaUri = ch.mediaUri; showChapterEditor = true },
+                    onToggleChapter = { ch ->
+                        val items = selectedCourse!!.chapterItems.map { if (it.id == ch.id) it.copy(completed = !it.completed) else it }
+                        val done = items.count { it.completed }
+                        persistCourse(selectedCourse!!.copy(chapters = items.size, chapterItems = items, progress = if (items.isEmpty()) 0 else done * 100 / items.size))
+                    },
+                    onDeleteChapter = { ch -> persistCourse(selectedCourse!!.copy(chapters = (selectedCourse!!.chapterItems.size - 1).coerceAtLeast(0), chapterItems = selectedCourse!!.chapterItems.filterNot { it.id == ch.id })) },
+                    onPlayMedia = { uri -> media.firstOrNull { it.uri == uri }?.let { selectedMedia = it; page = "player" } }
+                )
                 page == "root" -> when(tab) {
                     "学习" -> LearningHome(courses, media, Modifier.padding(padding), fg, sub, surface, primary) { c -> selectedCourse = c; page = "course" }
                     "课程" -> CourseList(courses, Modifier.padding(padding), fg, sub, surface, primary, onOpen = { selectedCourse = it; page = "course" }, onAdd = { showAddCourse = true })
@@ -182,6 +205,42 @@ private fun DeskOpsApp(speak: (String) -> Unit) {
             }
         }
     }
+
+    if (showChapterEditor && selectedCourse != null) AlertDialog(
+        onDismissRequest = { showChapterEditor = false },
+        title = { Text(if (editingChapter == null) "新增章节" else "编辑章节") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(chapterTitle, { chapterTitle = it }, label = { Text("章节名称") }, singleLine = true)
+                OutlinedTextField(chapterContent, { chapterContent = it }, label = { Text("章节正文") }, minLines = 4)
+                Text("关联媒体（可选）", style = MaterialTheme.typography.labelMedium)
+                var mediaExpanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(expanded = mediaExpanded, onExpandedChange = { mediaExpanded = !mediaExpanded }) {
+                    OutlinedTextField(
+                        value = media.firstOrNull { it.uri == chapterMediaUri }?.name ?: "不关联媒体",
+                        onValueChange = {}, readOnly = true, modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(mediaExpanded) }
+                    )
+                    ExposedDropdownMenu(expanded = mediaExpanded, onDismissRequest = { mediaExpanded = false }) {
+                        DropdownMenuItem(text = { Text("不关联媒体") }, onClick = { chapterMediaUri = ""; mediaExpanded = false })
+                        media.forEach { item -> DropdownMenuItem(text = { Text(item.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }, onClick = { chapterMediaUri = item.uri; mediaExpanded = false }) }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (chapterTitle.isNotBlank()) {
+                    val old = selectedCourse!!
+                    val ch = Chapter(editingChapter?.id ?: System.currentTimeMillis(), chapterTitle.trim(), chapterContent.trim(), chapterMediaUri, editingChapter?.completed ?: false, editingChapter?.lastPositionMs ?: 0L)
+                    val items = if (editingChapter == null) old.chapterItems + ch else old.chapterItems.map { if (it.id == ch.id) ch else it }
+                    persistCourse(old.copy(chapters = items.size, chapterItems = items))
+                    showChapterEditor = false
+                }
+            }) { Text("保存") }
+        },
+        dismissButton = { TextButton(onClick = { showChapterEditor = false }) { Text("取消") } }
+    )
 
     if (showAddCourse) AlertDialog(
         onDismissRequest = { showAddCourse = false },
@@ -256,7 +315,12 @@ private fun CourseCard(course: Course, surface: Color, fg: Color, sub: Color, pr
 }
 
 @Composable
-private fun CourseDetail(course: Course, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, speak: (String) -> Unit) {
+private fun CourseDetail(
+    course: Course, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color,
+    speak: (String) -> Unit, onAddChapter: () -> Unit, onEditChapter: (Chapter) -> Unit,
+    onToggleChapter: (Chapter) -> Unit, onDeleteChapter: (Chapter) -> Unit, onPlayMedia: (String) -> Unit
+) {
+    var expandedChapter by remember { mutableStateOf<Long?>(null) }
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(primary.copy(alpha = .12f)).padding(20.dp)) {
@@ -264,16 +328,44 @@ private fun CourseDetail(course: Course, modifier: Modifier, fg: Color, sub: Col
                 Spacer(Modifier.height(8.dp))
                 Text(course.title, color = fg, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 Text(course.intro.ifBlank { "为这门课程添加简介与学习目标。" }, color = sub, fontSize = 14.sp)
+                Spacer(Modifier.height(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(course.chapterItems.count { it.completed }.toString() + "/" + course.chapterItems.size + " 章节完成", color = sub, fontSize = 12.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text(course.progress.toString() + "%", color = primary, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.height(7.dp))
+                LinearProgressIndicator(progress = { course.progress.coerceIn(0, 100) / 100f }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = primary, trackColor = primary.copy(alpha = .16f))
             }
         }
-        item { Text("学习内容", color = fg, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
         item {
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(surface).padding(17.dp)) {
-                Text("第一章 · 基础知识", color = fg, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(8.dp))
-                Text("这里是课程章节内容区域。你可以在后续课程编辑中添加学习正文、视频、音频、重点标记和案例。", color = sub, lineHeight = 23.sp)
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(onClick = { speak("欢迎开始学习。这里是课程章节内容区域。你可以在后续课程编辑中添加学习正文、视频、音频、重点标记和案例。") }) { Icon(Icons.Rounded.VolumeUp, null); Text("朗读本节") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("课程章节", color = fg, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                FilledTonalButton(onClick = onAddChapter) { Icon(Icons.Rounded.Add, null); Text("新增章节") }
+            }
+        }
+        if (course.chapterItems.isEmpty()) item { EmptyCard("还没有章节", "新增章节后可填写正文并关联媒体文件", surface, sub) }
+        items(course.chapterItems, key = { it.id }) { chapter ->
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(surface).padding(15.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = chapter.completed, onCheckedChange = { onToggleChapter(chapter) })
+                    Column(Modifier.weight(1f).clickable { expandedChapter = if (expandedChapter == chapter.id) null else chapter.id }) {
+                        Text(chapter.title, color = fg, fontWeight = FontWeight.SemiBold)
+                        Text(if (chapter.completed) "已完成" else "未完成", color = sub, fontSize = 11.sp)
+                    }
+                    IconButton(onClick = { onEditChapter(chapter) }) { Icon(Icons.Rounded.Edit, "编辑章节", tint = primary) }
+                    IconButton(onClick = { onDeleteChapter(chapter) }) { Icon(Icons.Rounded.DeleteOutline, "删除章节", tint = sub) }
+                }
+                if (expandedChapter == chapter.id) {
+                    if (chapter.content.isNotBlank()) {
+                        Text(chapter.content, color = fg, lineHeight = 23.sp, modifier = Modifier.padding(start = 12.dp, top = 8.dp))
+                        TextButton(onClick = { speak(chapter.content) }) { Icon(Icons.Rounded.VolumeUp, null); Text("朗读本章") }
+                    } else Text("本章还没有正文内容", color = sub, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp))
+                    if (chapter.mediaUri.isNotBlank()) OutlinedButton(onClick = { onPlayMedia(chapter.mediaUri) }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Rounded.PlayCircle, null); Spacer(Modifier.width(6.dp)); Text("播放关联媒体")
+                    }
+                }
             }
         }
     }
