@@ -66,7 +66,7 @@ abstract class Page(val act: Activity, val app: App) {
             orientation = LinearLayout.VERTICAL
             // HTML 星球版 stage 左右留白 20px；极简版为 16px
             val pad = c.dp(if (Tokens.planet) 20f else 16f)
-            setPadding(pad, 0, pad, c.dp(30f))
+            // HTML stage 底部预留 122px；原生容器已避开 60px 底栏，因此内容补足 62px。\n            setPadding(pad, 0, pad, c.dp(62f))
         }
         val owner = (c as? ScrollOwner)
         val sv = object : NestedScrollView(c) {
