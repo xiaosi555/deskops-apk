@@ -31,16 +31,17 @@ object Tokens {
     var codeBg = 0xFFF5F7FA.toInt() // 命令块底色
     var dark = false
     var planet = true
-    var accentIndex = 0
+    var accentIndex = 4
+    var accentLine = 0
     var reducedMotion = false
 
-    /** 9 色板：苔绿 海盐蓝 雾紫 陶土 灰蓝 橄榄 浅棕 石墨 樱粉 */
+    /** 与 HTML ACCENT_PALETTE 一致的九色板，默认第 5 项翡翠绿。 */
     val PALETTE = listOf(
-        0xFF628B72.toInt(), 0xFF6689A5.toInt(), 0xFF8B7CA8.toInt(), 0xFFB47E68.toInt(),
-        0xFF718B91.toInt(), 0xFF87916A.toInt(), 0xFFA58B70.toInt(), 0xFF78817C.toInt(),
-        0xFFB98591.toInt(),
+        0xFFF5304A.toInt(), 0xFF1A6DFF.toInt(), 0xFF7A3CFF.toInt(),
+        0xFFFF7A00.toInt(), 0xFF00B56A.toInt(), 0xFF00A6C7.toInt(),
+        0xFFF23D97.toInt(), 0xFFF5B800.toInt(), 0xFF3B4BFF.toInt(),
     )
-    val PALETTE_NAMES = listOf("苔绿", "海盐蓝", "雾紫", "陶土", "灰蓝", "橄榄", "浅棕", "石墨", "樱粉")
+    val PALETTE_NAMES = listOf("珊瑚红", "海洋蓝", "电光紫", "活力橙", "翡翠绿", "湖水青", "玫瑰粉", "柠檬黄", "靛蓝")
 
     fun refresh(store: Store, systemDark: Boolean) {
         dark = when (store.appearance) {
@@ -49,33 +50,35 @@ object Tokens {
             Appearance.SYSTEM -> systemDark
         }
         planet = store.style == StyleMode.PLANET
-        accentIndex = store.accent.coerceIn(0, PALETTE.size - 1)
-        val base = PALETTE[accentIndex]
-        theme = if (dark) "dark" else "light"
-        // HTML applyAccent() 直接使用九色板；暗色模式不再额外漂白主色。
-        pri = base
-        onPri = 0xFFFFFFFF.toInt()
+        accentIndex = store.accent
+        val custom = if (store.accent == -1) runCatching { Color.parseColor(store.accentCustom) }.getOrNull() else null
+        val base = custom ?: PALETTE[store.accent.coerceIn(0, PALETTE.size - 1)]
+        // HTML applyAccent：暗色主色仅提亮 14%，亮色保持原始色值。
+        pri = if (dark) mix(base, 0xFFFFFFFF.toInt(), 0.14f) else base
+        onPri = if (ratioOn(pri) < 2.2f) 0xFF1B1D22.toInt() else 0xFFFFFFFF.toInt()
 
         // 与 HTML 最终级联后的 data-style / data-theme 变量逐项对应。
         if (planet && !dark) {
-            l0 = mix(0xFFFFFFFF.toInt(), pri, 0.025f)
-            l1 = l0
+            l0 = 0xFFFFFFFF.toInt()
+            l1 = 0xFFFFFFFF.toInt()
             l2 = 0xFFFFFFFF.toInt()
             l3 = mix(0xFFFFFFFF.toInt(), pri, 0.06f)
             ink = mix(0xFF0B1511.toInt(), pri, 0.16f)
             sub = mix(0xFF6B7873.toInt(), pri, 0.30f)
             priSoft = mix(0xFFFFFFFF.toInt(), pri, 0.11f)
             accentWash = mix(0xFFFFFFFF.toInt(), pri, 0.07f)
+            accentLine = mix(0xFFFFFFFF.toInt(), pri, 0.34f)
             hairc = mix(0xFFFFFFFF.toInt(), pri, 0.13f)
         } else if (planet && dark) {
-            l0 = mix(0xFF0C0F12.toInt(), pri, 0.07f)
-            l1 = l0
-            l2 = mix(0xFF12161A.toInt(), pri, 0.09f)
-            l3 = mix(0xFF171C21.toInt(), pri, 0.13f)
+            l0 = 0xFF0E1011.toInt()
+            l1 = 0xFF0E1011.toInt()
+            l2 = 0xFF141718.toInt()
+            l3 = mix(0xFF1A1D1E.toInt(), pri, 0.09f)
             ink = mix(0xFFEEF1F5.toInt(), pri, 0.08f)
             sub = mix(0xFF98A1AB.toInt(), pri, 0.22f)
             priSoft = mix(0xFF12161A.toInt(), pri, 0.17f)
             accentWash = mix(0xFF12161A.toInt(), pri, 0.11f)
+            accentLine = mix(0xFF12161A.toInt(), pri, 0.62f)
             hairc = withAlpha(pri, 0.14f)
         } else if (!dark) {
             // HTML 极简版浅色主题
@@ -87,6 +90,7 @@ object Tokens {
             sub = 0xFF898C91.toInt()
             priSoft = mix(0xFFFFFFFF.toInt(), pri, 0.06f)
             accentWash = 0xFFF3F3F3.toInt()
+            accentLine = 0xFFDDE4DF.toInt()
             hairc = 0x12000000
         } else {
             // HTML 极简版深色主题
@@ -98,6 +102,7 @@ object Tokens {
             sub = 0xFF8E9196.toInt()
             priSoft = mix(0xFF17181A.toInt(), pri, 0.12f)
             accentWash = 0xFF1D1E20.toInt()
+            accentLine = mix(0xFF17181A.toInt(), pri, 0.62f)
             hairc = 0x14FFFFFF
         }
 
