@@ -239,11 +239,6 @@ class Table(private val ctx: Context) {
 
 /** 封面：课程图标 / 用户上传图片；星球版圆角 6、极简版 17 */
 object Covers {
-    private val GRADS = mapOf(
-        "cv-a" to intArrayOf(0xFF2F6FED.toInt(), 0xFF188A5C.toInt()),
-        "cv-b" to intArrayOf(0xFF7A5AF8.toInt(), 0xFF2F6FED.toInt()),
-    )
-
     fun view(ctx: Context, sizePx: Int, coverFile: String?, coverClass: String, glyph: String, round: Float = Tokens.rCover()): View {
         val v = android.widget.FrameLayout(ctx)
         v.layoutParams = LinearLayout.LayoutParams(sizePx, sizePx)
@@ -256,7 +251,12 @@ object Covers {
             if (bmp != null) img.setImageBitmap(bmp)
             v.flat(Tokens.priSoft, r)
         } else {
-            val colors = GRADS[coverClass] ?: intArrayOf(Tokens.pri, Tokens.withAlpha(Tokens.pri, 1f))
+            // HTML v6 将 cv-a / cv-b / cv-c 统一为同一组绿色课程封面渐变。
+            val colors = if (Tokens.dark) {
+                intArrayOf(0xFF2A9E5B.toInt(), 0xFF1F7D46.toInt())
+            } else {
+                intArrayOf(0xFF34C374.toInt(), 0xFF27AE60.toInt())
+            }
             val g = android.graphics.drawable.GradientDrawable()
             g.orientation = android.graphics.drawable.GradientDrawable.Orientation.TL_BR
             g.colors = colors
