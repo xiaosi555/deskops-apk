@@ -265,7 +265,7 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                     highlights = highlights.filter { it.courseId == selectedCourse!!.id }
                 )
                 page == "root" -> when(tab) {
-                    "学习" -> LearningHome(courses, media, Modifier.padding(padding), fg, sub, surface, primary) { c -> selectedCourse = c; page = "course" }
+                    "学习" -> LearningHome(courses, media, sessions, Modifier.padding(padding), fg, sub, surface, primary) { c -> selectedCourse = c; page = "course" }
                     "课程" -> CourseList(courses, Modifier.padding(padding), fg, sub, surface, primary, onOpen = { selectedCourse = it; page = "course" }, onAdd = { showAddCourse = true })
                     "媒体" -> MediaLibrary(media, Modifier.padding(padding), fg, sub, surface, primary, onPlay = { activeCourseId = 0L; activeChapterId = 0L; selectedMedia = it; page = "player" }, onImportFiles = { mediaPicker.launch(arrayOf("video/*", "audio/*")) }, onImportFolder = { folderPicker.launch(null) }, onRemove = { item -> media.remove(item); prefs.edit().putString("media", writeMedia(media)).apply() })
                     else -> SettingsScreen(themeChoice, darkMode, Modifier.padding(padding), fg, sub, surface, primary,
@@ -341,7 +341,7 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
 }
 
 @Composable
-private fun LearningHome(courses: List<Course>, media: List<DeskMedia>, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, open: (Course) -> Unit) {
+private fun LearningHome(courses: List<Course>, media: List<DeskMedia>, sessions: List<StudySession>, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, open: (Course) -> Unit) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(primary).padding(22.dp)) {
@@ -356,6 +356,7 @@ private fun LearningHome(courses: List<Course>, media: List<DeskMedia>, modifier
                 }
             }
         }
+        item { StudyCalendarCard(sessions, surface, fg, sub, primary) }
         item { SectionTitle("继续学习", "查看全部", fg) }
         if (courses.isEmpty()) item { EmptyCard("还没有课程", "创建课程，整理你的学习内容", surface, sub) }
         items(courses.take(4)) { c -> CourseCard(c, surface, fg, sub, primary) { open(c) } }
@@ -443,6 +444,17 @@ private fun CourseDetail(
                     if (chapter.mediaUri.isNotBlank()) OutlinedButton(onClick = { onPlayMedia(chapter.mediaUri, chapter.id) }, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Rounded.PlayCircle, null); Spacer(Modifier.width(6.dp)); Text("播放关联媒体")
                     }
+                }
+            }
+        }
+        if (highlights.isNotEmpty()) {
+            item {
+                Text("本课程摘录", color = fg, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            items(highlights.sortedByDescending { it.createdAt }, key = { it.id }) { highlight ->
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(surface).padding(15.dp)) {
+                    Text(highlight.text, color = fg, maxLines = 5, overflow = TextOverflow.Ellipsis, lineHeight = 22.sp)
+                    Text(java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(java.util.Date(highlight.createdAt)), color = sub, fontSize = 11.sp)
                 }
             }
         }
@@ -571,6 +583,40 @@ private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Co
             }
         }
         item { Text("桌面运维学习 · Android 原生版 2.0", color = sub, fontSize = 12.sp) }
+    }
+}
+
+@Composable
+private fun StudyCalendarCard(sessions: List<StudySession>, surface: Color, fg: Color, sub: Color, primary: Color) {
+    val calendar = java.util.Calendar.getInstance()
+    val format = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val days = (6 downTo 0).map { offset ->
+        val day = calendar.clone() as java.util.Calendar
+        day.add(java.util.Calendar.DAY_OF_YEAR, -offset)
+        format.format(day.time)
+    }
+    val minutes = days.map { day -> sessions.filter { it.day == day }.sumOf { it.durationMs } / 60000L }
+    val maxValue = (minutes.maxOrNull() ?: 0L).coerceAtLeast(1L)
+    val totalMinutes = sessions.sumOf { it.durationMs } / 60000L
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(surface).padding(17.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("学习日历", color = fg, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("近 7 天的媒体学习时长", color = sub, fontSize = 12.sp)
+            }
+            Text(if (totalMinutes >= 60) (totalMinutes / 60).toString() + "小时" + (totalMinutes % 60) + "分" else totalMinutes.toString() + "分钟", color = primary, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(16.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            days.forEachIndexed { index, day ->
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(if (minutes[index] > 0) minutes[index].toString() else "", color = sub, fontSize = 9.sp)
+                    Box(Modifier.fillMaxWidth().height((8 + 48f * minutes[index] / maxValue).dp).clip(RoundedCornerShape(5.dp)).background(if (minutes[index] > 0) primary else primary.copy(alpha = .10f)))
+                    Text(day.takeLast(5).replace("-", "/"), color = sub, fontSize = 9.sp, maxLines = 1)
+                }
+            }
+        }
+        Text("累计学习记录 " + sessions.size + " 次", color = sub, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp))
     }
 }
 
