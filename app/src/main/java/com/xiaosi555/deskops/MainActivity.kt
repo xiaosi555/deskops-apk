@@ -730,37 +730,75 @@ private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Co
 
 @Composable
 private fun StudyCalendarCard(sessions: List<StudySession>, courses: List<Course>, surface: Color, fg: Color, sub: Color, primary: Color) {
-    val calendar = java.util.Calendar.getInstance()
-    val format = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    val days = (6 downTo 0).map { offset ->
-        val day = calendar.clone() as java.util.Calendar
-        day.add(java.util.Calendar.DAY_OF_YEAR, -offset)
-        format.format(day.time)
+    val dateFormat = remember { java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+    val monthCalendar = java.util.Calendar.getInstance().apply { set(java.util.Calendar.DAY_OF_MONTH, 1) }
+    val monthPrefix = java.text.SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(monthCalendar.time)
+    val monthTitle = java.text.SimpleDateFormat("yyyy年M月", Locale.getDefault()).format(monthCalendar.time)
+    val firstOffset = (monthCalendar.get(java.util.Calendar.DAY_OF_WEEK) - monthCalendar.firstDayOfWeek + 7) % 7
+    val dayCount = monthCalendar.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    val cells = buildList<Int?> {
+        repeat(firstOffset) { add(null) }
+        repeat(dayCount) { add(it + 1) }
+        while (size % 7 != 0) add(null)
     }
-    val minutes = days.map { day -> sessions.filter { it.day == day }.sumOf { it.durationMs } / 60000L }
-    val maxValue = (minutes.maxOrNull() ?: 0L).coerceAtLeast(1L)
+    val sessionsByDay = sessions.groupBy { it.day }
+    var selectedDay by remember { mutableStateOf(dateFormat.format(java.util.Date())) }
+    val selectedDayKey = if (selectedDay.startsWith(monthPrefix)) selectedDay else monthPrefix + "-01"
+    val selectedSessions = sessionsByDay[selectedDayKey].orEmpty()
+    val selectedMinutes = selectedSessions.sumOf { it.durationMs } / 60000L
+    val selectedCourses = selectedSessions.filter { it.courseId != 0L }.map { it.courseId }.distinct().size
+    val averageProgress = if (courses.isEmpty()) 0 else courses.map { it.progress.coerceIn(0, 100) }.average().toInt()
     val totalMinutes = sessions.sumOf { it.durationMs } / 60000L
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(surface).padding(17.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("学习日历", color = fg, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text("近 7 天的媒体学习时长", color = sub, fontSize = 12.sp)
+                Text(monthTitle + " · 选择日期查看学习情况", color = sub, fontSize = 12.sp)
             }
             Text(if (totalMinutes >= 60) (totalMinutes / 60).toString() + "小时" + (totalMinutes % 60) + "分" else totalMinutes.toString() + "分钟", color = primary, fontWeight = FontWeight.Bold)
         }
-        Spacer(Modifier.height(16.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-            days.forEachIndexed { index, day ->
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (minutes[index] > 0) minutes[index].toString() else "", color = sub, fontSize = 9.sp)
-                    Box(Modifier.fillMaxWidth().height((8 + 48f * minutes[index] / maxValue).dp).clip(RoundedCornerShape(5.dp)).background(if (minutes[index] > 0) primary else primary.copy(alpha = .10f)))
-                    Text(day.takeLast(5).replace("-", "/"), color = sub, fontSize = 9.sp, maxLines = 1)
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            listOf("日", "一", "二", "三", "四", "五", "六").forEach { label ->
+                Text(label, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = sub, fontSize = 11.sp)
+            }
+        }
+        cells.chunked(7).forEach { week ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                week.forEach { day ->
+                    if (day == null) Spacer(Modifier.weight(1f).aspectRatio(1f))
+                    else {
+                        val key = monthPrefix + "-" + day.toString().padStart(2, '0')
+                        val hasStudy = !sessionsByDay[key].isNullOrEmpty()
+                        val selected = key == selectedDayKey
+                        Column(
+                            Modifier.weight(1f).aspectRatio(1f).padding(1.dp).clip(RoundedCornerShape(9.dp))
+                                .background(if (selected) primary else if (hasStudy) primary.copy(alpha = .13f) else Color.Transparent)
+                                .clickable { selectedDay = key },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(day.toString(), color = if (selected) Color.White else fg, fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+                            if (hasStudy) Box(Modifier.padding(top = 2.dp).size(4.dp).clip(CircleShape).background(if (selected) Color.White else primary))
+                        }
+                    }
                 }
             }
         }
-        val weekSessions = sessions.filter { it.day in days && it.courseId != 0L }
-        val averageProgress = if (courses.isEmpty()) 0 else courses.map { it.progress.coerceIn(0, 100) }.average().toInt()
-        Text("近 7 天学习课程 " + weekSessions.map { it.courseId }.distinct().size + " 门 · 课程平均完成 " + averageProgress + "%", color = sub, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp))
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CalendarStat("当日学习", selectedMinutes.toString() + " 分钟", primary, Modifier.weight(1f))
+            CalendarStat("参与课程", selectedCourses.toString() + " 门", primary, Modifier.weight(1f))
+            CalendarStat("课程平均进度", averageProgress.toString() + "%", primary, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun CalendarStat(label: String, value: String, primary: Color, modifier: Modifier = Modifier) {
+    Column(modifier.clip(RoundedCornerShape(12.dp)).background(primary.copy(alpha = .08f)).padding(10.dp)) {
+        Text(value, color = primary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = Color.Gray, fontSize = 10.sp, maxLines = 1)
     }
 }
 
