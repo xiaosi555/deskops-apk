@@ -184,8 +184,8 @@ class SelectionBar(private val act: Activity, private val app: App) {
         val h = if (b.height > 0) b.height.toFloat() else app.dp(44f).toFloat()
         var x = if (app.store.barX >= 0) app.store.barX else (loc[0] - scr[0]).toFloat()
         var y = if (app.store.barY >= 0) app.store.barY else (loc[1] - scr[1] - h - app.dp(10f))
-        x = x.coerceIn(app.dp(6f).toFloat(), max(app.dp(6f).toFloat(), root.width - w - app.dp(6f)))
-        y = y.coerceIn(app.dp(48f).toFloat(), max(app.dp(48f).toFloat(), root.height - h - app.dp(84f)))
+        x = x.coerceIn(app.dp(6f).toFloat(), max(app.dp(6f).toFloat(), root.width.toFloat() - w - app.dp(6f).toFloat()))
+        y = y.coerceIn(app.dp(48f).toFloat(), max(app.dp(48f).toFloat(), root.height.toFloat() - h - app.dp(84f).toFloat()))
         b.x = x; b.y = y
         app.store.barX = x; app.store.barY = y
         target?.setSelection(start, end)
@@ -252,8 +252,8 @@ class SelectionBar(private val act: Activity, private val app: App) {
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (!down || root == null) return@setOnTouchListener false
-                    bar.x = (e.rawX - dx).coerceIn(app.dp(6f).toFloat(), root.width - bar.width - app.dp(6f))
-                    bar.y = (e.rawY - dy).coerceIn(app.dp(48f).toFloat(), root.height - bar.height - app.dp(84f))
+                    bar.x = (e.rawX - dx).coerceIn(app.dp(6f).toFloat(), root.width.toFloat() - bar.width.toFloat() - app.dp(6f).toFloat())
+                    bar.y = (e.rawY - dy).coerceIn(app.dp(48f).toFloat(), root.height.toFloat() - bar.height.toFloat() - app.dp(84f).toFloat())
                     app.store.barX = bar.x; app.store.barY = bar.y
                     true
                 }

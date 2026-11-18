@@ -79,6 +79,7 @@ class MiniBar(ctx: Context, private val app: App, private val go: (String) -> Un
 
     fun render(view: String) {
         val ctx = context
+        val ctx = context
         val planet = Tokens.planet
         val b = app.store.bag()
         val pinned = if (b.pin.isNotEmpty()) pack().chById(b.pin) else null

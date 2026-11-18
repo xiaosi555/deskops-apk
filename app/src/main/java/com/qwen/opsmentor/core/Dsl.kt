@@ -118,7 +118,7 @@ fun ViewGroup.add(v: View, w: Int = ViewGroup.LayoutParams.MATCH_PARENT, h: Int 
     val d = context.resources.displayMetrics.density
     val lp = if (this is LinearLayout) LinearLayout.LayoutParams(w, h) else ViewGroup.LayoutParams(w, h)
     if (lp is LinearLayout.LayoutParams) lp.weight = weight
-    lp.setMargins((l * d).toInt(), (t * d).toInt(), (r * d).toInt(), (b * d).toInt())
+    if (lp is ViewGroup.MarginLayoutParams) lp.setMargins((l * d).toInt(), (t * d).toInt(), (r * d).toInt(), (b * d).toInt())
     addView(v, lp)
     return v
 }
@@ -374,3 +374,7 @@ fun emptyState(ctx: Context, icon: String, title: String, subtitle: String): Lin
     addView(muted(ctx, subtitle, 12.5f),
         LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = ctx.dp(5f) })
 }
+
+fun View.flat(color: Int, radiusPx: Int) = flat(color, radiusPx.toFloat())
+fun View.surface(color: Int, radiusPx: Int, elevationDp: Float = 0f, stroke: Boolean = false) =
+    surface(color, radiusPx.toFloat(), elevationDp, stroke)

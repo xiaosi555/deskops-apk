@@ -323,7 +323,7 @@ object Bars {
             val r = hrow(ctx)
             row.forEach { (v, k) ->
                 val cell = vcol(ctx)
-                cell.flat(if (Tokens.planet) Tokens.l2 else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(Tokens.rInner()))
+                cell.flat(if (Tokens.planet) Tokens.l2 else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(Tokens.rInner()).toFloat()
                 val p = ctx.dp(10f)
                 cell.setPadding(p, p, p, p)
                 cell.addView(label(ctx, v, 19f, Tokens.ink, Tokens.weightH()))
@@ -333,7 +333,7 @@ object Bars {
                 })
                 val num = cell.getChildAt(0) as android.widget.TextView
                 val n = Regex("^(\\d+)").find(v)?.groupValues?.get(1)?.toIntOrNull()
-                if (n != null) num.countUp(n, v.substring(Regex("^(\\d+)").match(v)!!.value.length))
+                if (n != null) num.countUp(n, v.substring(Regex("^(\\d+)").find(v)!!.value.length))
             }
             grid.addView(r, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.bottomMargin = ctx.dp(8f) })
         }

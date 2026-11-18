@@ -368,7 +368,7 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
             if (mode == "week") {
                 for (i in 0..6) {
                     val d = dayAt(from, i)
-                    items.add("一二三四五六日"[i].toString() + (if (fmt.format(d) == fmt.format(Date())) "·今" else ""), minutesOf(fmt.format(d)))
+                    items.add("一二三四五六日"[i].toString() + (if (fmt.format(d) == fmt.format(Date())) "·今" else "") to minutesOf(fmt.format(d)))
                 }
             } else {
                 val y = Calendar.getInstance().apply { add(Calendar.YEAR, off) }.get(Calendar.YEAR)
@@ -378,7 +378,7 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
                     while (c2.get(Calendar.MONTH) == mth) {
                         v += minutesOf(fmt.format(c2.time)); c2.add(Calendar.DAY_OF_MONTH, 1)
                     }
-                    items.add("${mth + 1}", v)
+                    items.add("${mth + 1}" to v)
                 }
             }
             val mx = items.maxOf { it.second }.coerceAtLeast(1)

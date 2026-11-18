@@ -1,4 +1,5 @@
 package com.qwen.opsmentor.ui.pages
+import com.qwen.opsmentor.core.animatePop
 
 import android.app.Activity
 import android.view.Gravity
@@ -320,12 +321,6 @@ class PageCourse(act: Activity, app: App) : Page(act, app) {
 
     // ---------------- 共享 ----------------
 
-    private fun currentChapterId(): String {
-        val b = app.store.bag()
-        if (b.pin.isNotEmpty() && pack.chById(b.pin) != null) return b.pin
-        val q = pack.route(b.route)
-        return if (q.isEmpty()) "" else q[b.idx.coerceIn(0, q.size - 1)]
-    }
 
     private fun openChapter(id: String) = (act as? MainActivity)?.openChapter(id) ?: run { nav("today") }
 

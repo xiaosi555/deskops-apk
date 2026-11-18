@@ -1,4 +1,5 @@
 package com.qwen.opsmentor.ui.pages
+import com.qwen.opsmentor.core.groupTitle
 
 import android.app.Activity
 import android.view.Gravity
@@ -123,7 +124,7 @@ class PageProfile(act: Activity, app: App) : Page(act, app) {
             }
             box.addView(iv, FrameLayout.LayoutParams(ctx.dp(66f), ctx.dp(66f)))
         } else {
-            val c = View(ctx)
+            val c = FrameLayout(ctx)
             c.flat(if (Tokens.planet) Tokens.priSoft else Tokens.pri, 33f)
             c.addView(label(ctx, name.substring(0, 1), 26f, if (Tokens.planet) Tokens.pri else Tokens.onPri, Tokens.weightH()),
                 FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.gravity = Gravity.CENTER })

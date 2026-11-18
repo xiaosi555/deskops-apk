@@ -208,7 +208,7 @@ data class Chapter(
     val id: String, val m: String, val t: String, val s: String,
     val terms: String, val plain: List<Pair<String, String>>,
     val cmds: List<Cmd>, val pits: List<Pit>, val gate: String,
-    val quiz: Quiz, val content: String = "", val media: MediaRef? = null,
+    val quiz: Quiz, val content: String = "", var media: MediaRef? = null,
 )
 
 /** 知识详解：标题+细节 / 命令+回显 / 名称+链路 */

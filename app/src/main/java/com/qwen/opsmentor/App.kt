@@ -49,6 +49,8 @@ class App : Application() {
         com.qwen.opsmentor.media.MediaCourses.restore(this, store)
     }
 
+    fun updateSystemDark(value: Boolean) { systemDark = value; refreshTheme() }
+
     fun refreshTheme() {
         Tokens.refresh(store, systemDark)
     }

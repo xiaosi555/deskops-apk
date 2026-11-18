@@ -1,4 +1,8 @@
 package com.qwen.opsmentor.ui.pages
+import android.widget.TextView
+import com.qwen.opsmentor.data.lines
+import com.qwen.opsmentor.core.weight
+import com.qwen.opsmentor.core.size
 
 import android.app.Activity
 import android.text.TextUtils
@@ -246,7 +250,7 @@ class PageToday(act: Activity, app: App) : Page(act, app) {
                 val bx = vcol(ctx)
                 g.lines().forEachIndexed { j, line ->
                     bx.addView(paragraph(line, "G${i}$j", 14.5f),
-                        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(if (j == 0) 0 else 3f) })
+                        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(if (j == 0) 0f else 3f) })
                     segs.add(line)
                 }
                 bx.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(10f) }
@@ -267,13 +271,13 @@ class PageToday(act: Activity, app: App) : Page(act, app) {
             ans.visibility = View.GONE
             val row = btnRow(ctx)
             row.setPadding(0, ctx.dp(10f), 0, 0)
-            row.addView(btn(ctx, "看参考答案", "n", small = true).also {
-                it.setOnClickListener {
-                    if (ans.visibility == View.GONE) {
-                        ans.visibility = View.VISIBLE; ans.maxLines = 0; it.text = "收起答案"
-                    } else { ans.visibility = View.GONE; it.text = "看参考答案" }
-                }
-            })
+            val toggle = btn(ctx, "看参考答案", "n", small = true)
+            toggle.setOnClickListener {
+                if (ans.visibility == View.GONE) {
+                    ans.visibility = View.VISIBLE; ans.maxLines = 0; toggle.text = "收起答案"
+                } else { ans.visibility = View.GONE; toggle.text = "看参考答案" }
+            }
+            row.addView(toggle)
             row.addView(btn(ctx, "这题我答对了 · 标记 🟢 过关", "pri", small = true).also { b ->
                 b.setOnClickListener {
                     val bag = app.store.bag()
@@ -368,8 +372,8 @@ class PageToday(act: Activity, app: App) : Page(act, app) {
         return w
     }
 
-    private fun View.circleS(ctx: Activity, color: Int, rDp: Float) {
-        flat(if (Tokens.planet) Tokens.pri else Tokens.priSoft, ctx.dp(rDp))
+    private fun TextView.circleS(ctx: Activity, color: Int, rDp: Float) {
+        flat(if (Tokens.planet) color else Tokens.priSoft, ctx.dp(rDp).toFloat())
         setTextColor(if (Tokens.planet) Tokens.onPri else Tokens.pri)
     }
 }

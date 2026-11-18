@@ -1,4 +1,6 @@
 package com.qwen.opsmentor.ui.pages
+import com.qwen.opsmentor.core.weight
+import com.qwen.opsmentor.core.size
 
 import android.app.Activity
 import android.view.Gravity
@@ -152,7 +154,7 @@ class PageReview(act: Activity, app: App) : Page(act, app) {
             "核心原则：逼自己回忆，而不是重读笔记。重读会产生“我认识它”的错觉，只有提取才建立长期通路。答错的条目会退回第 2 天节奏重新走。")
         c.addView(pill(ctx, pack.intervals.joinToString(" / ") + " 天", true), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         val row = btnRow(ctx)
-        (row.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = ctx.dp(12f)
+        row.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(12f) }
         row.addView(btn(ctx, "现在开始抽问", "pri").also { it.setOnClickListener { (act as? MainActivity)?.nav("today") } })
         row.addView(btn(ctx, if (all) "只看今日到期" else "查看全部条目", "n").also {
             it.setOnClickListener { all = !all; rerender(false) }
@@ -237,7 +239,7 @@ class PageCases(act: Activity, app: App) : Page(act, app) {
             "比学习笔记更重要——面试和实际排障都直接调它。五栏固定，写到 30 条以上就能直接转成面试 STAR 素材。数据存在本机。")
         c.addView(pill(ctx, "${store.cases.size} 条", true), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         val row = btnRow(ctx)
-        (row.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = ctx.dp(12f)
+        row.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(12f) }
         row.addView(btn(ctx, "＋ 新建案例", "pri").also {
             it.setOnClickListener {
                 draft = CaseRec(CaseRec.nextCode(store.cases), "", "", "", "", currentChapterId())
@@ -367,7 +369,7 @@ class PageGloss(act: Activity, app: App) : Page(act, app) {
         val c = toolHeader(host, "aA", "术语手册", "每学完一章，把这一章的核心术语加进来。这张表一路长大，就是你自己的运维词典，也是面试前的速查页。")
         c.addView(pill(ctx, "自填 ${store.gloss.size} 条 ｜ 自动生成 ${auto.size} 条", true), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         val row = btnRow(ctx)
-        (row.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = ctx.dp(12f)
+        row.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(12f) }
         row.addView(btn(ctx, "＋ 补充术语", "pri").also { it.setOnClickListener { addTerm() } })
         row.addView(btn(ctx, "从已学章节自动导入", "n").also {
             it.setOnClickListener { rerender(false); Sheets.toast(ctx, "已学章节的双轨对照已全部展示在表中") }

@@ -1,4 +1,5 @@
 package com.qwen.opsmentor.ui.pages
+import com.qwen.opsmentor.data.toJson
 
 import android.app.Activity
 import android.media.MediaPlayer
@@ -167,7 +168,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                 val ch = current() ?: return@pickMedia
                 ch.media = com.qwen.opsmentor.data.MediaRef(kind, item.name, item.uri.toString(), item.size, ch.media?.dur ?: 0)
                 val uc = store.userCourses.firstOrNull { it.id == store.cur }
-                uc?.packJson = pack.toJson().toString()
+                uc?.let { it.packJson = pack.toJson().toString() }
                 store.save(); app.packs.put(store.cur, pack); rerender(true)
             }
         }

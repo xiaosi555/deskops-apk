@@ -94,8 +94,8 @@ object CourseEditor {
             isHorizontalScrollBarEnabled = false
             addView(glyphBox, ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }))
-        val ti = body.getChildAt(1).getChildAt(1) as EditText
-        val su = body.getChildAt(2).getChildAt(1) as EditText
+        val ti = (body.getChildAt(1) as ViewGroup).getChildAt(1) as EditText
+        val su = (body.getChildAt(2) as ViewGroup).getChildAt(1) as EditText
         val builtin = !co.custom
         Sheets.sheet(ctx, "编辑课程", body, "保存",
             cancelText = if (builtin) "删除" else "取消", danger = builtin,
@@ -139,8 +139,8 @@ object CourseEditor {
         body.addView(up)
         body.add(Sheets.field(ctx, "课程名称", Sheets.input(ctx, "", "课程名称", 40)), t = 8)
         body.addView(Sheets.field(ctx, "课程简介", Sheets.input(ctx, "", "课程简介", 200, true)))
-        val ti = body.getChildAt(1).getChildAt(1) as EditText
-        val su = body.getChildAt(2).getChildAt(1) as EditText
+        val ti = (body.getChildAt(1) as ViewGroup).getChildAt(1) as EditText
+        val su = (body.getChildAt(2) as ViewGroup).getChildAt(1) as EditText
         Sheets.sheet(ctx, "新增课程", body, "保存", onSave = {
             val title = ti.text.toString().trim()
             if (title.isEmpty()) { Sheets.toast(ctx, "请填写课程名称"); return@sheet false }
@@ -170,7 +170,7 @@ object ProfileEditor {
         val nameInp = Sheets.input(ctx, s.profileName, "你的名字", 16)
         fun paint() {
             prev.removeAllViews()
-            val v = View(ctx)
+            val v = FrameLayout(ctx)
             val p = ctx.dp(66f)
             v.layoutParams = FrameLayout.LayoutParams(p, p)
             if (avatar.isNotEmpty() && File(avatar).exists()) {

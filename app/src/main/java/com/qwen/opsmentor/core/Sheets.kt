@@ -149,7 +149,7 @@ object Sheets {
             val ft = hrow(ctx)
             ft.setPadding(ctx.dp(14f), ctx.dp(10f), ctx.dp(14f), ctx.dp(14f) + insetBottom(ctx))
             val c = btn(ctx, cancelText, if (danger) "danger" else "n")
-            val s = btn(ctx, saveText, "pri")
+            val s = btn(ctx, saveText ?: "保存", "pri")
             ft.addView(c)
             ft.addView(s, LinearLayout.LayoutParams(0, ctx.dp(44f), 1f).also { it.leftMargin = ctx.dp(8f) })
             c.setOnClickListener {
