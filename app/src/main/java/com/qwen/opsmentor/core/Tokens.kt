@@ -105,7 +105,10 @@ object Tokens {
         ok = pri
         warn = mix(0xFFFFFFFF.toInt(), pri, 0.70f)
         bad = mix(0xFF1D2026.toInt(), pri, 0.74f)
-        scrim = if (dark) 0xCC000000.toInt() else 0x731B2228.toInt()
+        scrim = if (planet) {
+            // HTML 星球版弹层遮罩：主色 12% 混入深色底，整体透明度约 49%。
+            withAlpha(mix(0xFF0A0E12.toInt(), pri, 0.245f), 0.49f)
+        } else 0x4719201B
         codeBg = l3
     }
 
