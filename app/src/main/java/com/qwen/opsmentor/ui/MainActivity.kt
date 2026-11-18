@@ -391,7 +391,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         val onTab = tabs.containsKey(view)
         val page = pages.getOrPut(view) { make(view) }
         val sv = page.ensure()
-        if (stage.childCount != 1 || stage.getChildAt(0) !== sv) {
+        val pageChanged = stage.childCount != 1 || stage.getChildAt(0) !== sv
+        if (pageChanged) {
             selectionBar.close()
             stage.removeAllViews()
             stage.addView(sv, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -422,7 +423,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         renderTabbar(onTab)
         com.qwen.opsmentor.core.Pages.locator = { m -> page.locate(m) }
         app.timer.onPage(view, page.learning)
-        page.rerender(toTop)
+        page.rerender(toTop, animateItems = pageChanged)
         toTop = false
         mini.render(view)
         updateReaderPill()
