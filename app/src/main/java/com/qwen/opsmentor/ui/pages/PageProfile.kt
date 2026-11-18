@@ -86,7 +86,7 @@ class PageProfile(act: Activity, app: App) : Page(act, app) {
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(8f) })
         bannerLeft.addView(bannerTitle)
         bannerLeft.addView(muted(ctx,
-            "已过关 \${pr.done} / \${pr.total} 章 · 累计学习 Day \${s.bag().day}",
+            "已过关 ${pr.done} / ${pr.total} 章 · 累计学习 Day ${s.bag().day}",
             12f, 2
         ), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
             it.topMargin = ctx.dp(6f)
