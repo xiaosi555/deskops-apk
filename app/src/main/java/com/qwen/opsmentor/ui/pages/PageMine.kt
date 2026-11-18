@@ -89,6 +89,13 @@ class PageMine(act: Activity, app: App) : Page(act, app) {
                 }
             })
         }
+        inp.setOnFocusChangeListener { _, focused ->
+            box.background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Tokens.l2)
+                cornerRadius = ctx.dp(14f).toFloat()
+                if (focused) setStroke(ctx.dp(1f), Tokens.accentLine)
+            }
+        }
         box.addView(inp, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         val clr = iconBtn(ctx, "close", "清除", 28f) {
             kw = ""; rerender(false)
