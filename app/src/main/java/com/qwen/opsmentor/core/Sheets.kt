@@ -16,6 +16,8 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import androidx.core.widget.NestedScrollView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.qwen.opsmentor.state.LineType
 import com.qwen.opsmentor.state.MarkColor
 import java.text.SimpleDateFormat
@@ -139,12 +141,23 @@ object Sheets {
         hd.addView(iconBtn(ctx, "close", "关闭", 34f) { d.dismiss() })
         hd.setPadding(ctx.dp(16f), ctx.dp(10f), ctx.dp(12f), ctx.dp(6f))
         sh.addView(hd)
-        val scroll = NestedScrollView(ctx).apply {
+        // HTML Sheet：主体自然撑开，超过 90% 屏高后只滚动内容区；不能用 0dp+weight
+        // 配合 WRAP_CONTENT 父容器，否则父容器没有剩余高度时会把整个正文压成 0 高。
+        val screenHeight = ctx.resources.displayMetrics.heightPixels
+        val maxSheetHeight = (screenHeight * 0.90f).toInt()
+        val reserved = ctx.dp(64f) + if (onSave != null) ctx.dp(72f) else insetBottom(ctx)
+        val htmlBodyCap = (maxSheetHeight - reserved).coerceAtLeast(ctx.dp(120f))
+        val bodyCap = if (maxHeightPx > 0) minOf(maxHeightPx, htmlBodyCap) else htmlBodyCap
+        val scroll = object : NestedScrollView(ctx) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                val cappedHeight = MeasureSpec.makeMeasureSpec(bodyCap, MeasureSpec.AT_MOST)
+                super.onMeasure(widthMeasureSpec, cappedHeight)
+            }
+        }.apply {
             isVerticalScrollBarEnabled = false
             addView(body, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            if (maxHeightPx > 0) layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx)
         }
-        sh.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, if (maxHeightPx > 0) ViewGroup.LayoutParams.WRAP_CONTENT else 0, 1f))
+        sh.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         if (onSave != null) {
             val ft = hrow(ctx)
             ft.setPadding(ctx.dp(14f), ctx.dp(10f), ctx.dp(14f), ctx.dp(14f) + insetBottom(ctx))
@@ -170,7 +183,11 @@ object Sheets {
         return d
     }
 
-    private fun insetBottom(ctx: Context): Int = 0
+    private fun insetBottom(ctx: Context): Int {
+        val activity = ctx as? android.app.Activity ?: return 0
+        val insets = ViewCompat.getRootWindowInsets(activity.window.decorView) ?: return 0
+        return insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+    }
 
     /** 表单字段：label + 控件 */
     fun field(ctx: Context, labelText: String, control: View): LinearLayout = LinearLayout(ctx).apply {
