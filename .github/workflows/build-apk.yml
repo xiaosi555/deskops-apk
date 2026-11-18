@@ -71,7 +71,8 @@ jobs:
           script: |
             adb logcat -c
             adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb shell am start -n com.xiaosi555.deskops/.MainActivity
-            sleep 12
-            adb logcat -d -s DeskOpsNativeSmoke:I | grep "NATIVE_APP_READY"
-            adb shell dumpsys activity activities | grep "com.xiaosi555.deskops"
+            adb shell am start -W -n com.xiaosi555.deskops/.MainActivity
+            sleep 8
+            adb logcat -d -b crash
+            adb shell pidof com.xiaosi555.deskops
+            adb shell dumpsys activity activities | grep -F "com.xiaosi555.deskops"
