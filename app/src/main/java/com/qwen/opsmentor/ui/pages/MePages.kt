@@ -326,25 +326,40 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
         val (from, to, label2) = range(now)
         val days = daysBetween(from, to)
         val tabs = hrow(ctx)
-        listOf("day" to "日", "week" to "周", "month" to "月", "year" to "年").forEach { (k, n) ->
-            tabs.addView(chip(ctx, n, mode == k) { mode = k; off = 0; rerender(true) },
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also {
-                    if (tabs.childCount > 0) it.marginStart = ctx.dp(6f)
-                })
+        listOf("day" to "日", "week" to "周", "month" to "月", "year" to "年").forEachIndexed { index, (k, n) ->
+            val selected = mode == k
+            val item = vcol(ctx).apply { gravity = Gravity.CENTER_HORIZONTAL; isClickable = true }
+            val title = label(ctx, n, 15.5f, if (selected) Tokens.pri else Tokens.sub,
+                if (selected) Tokens.weightH() else Tokens.weightB())
+            title.setPadding(0, ctx.dp(10f), 0, ctx.dp(11f))
+            item.addView(title)
+            item.addView(View(ctx).apply { flat(if (selected) Tokens.pri else android.graphics.Color.TRANSPARENT, 1.5f) },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(2f)))
+            item.setOnClickListener { mode = k; off = 0; rerender(true) }
+            tabs.addView(item, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
+                if (index > 0) it.marginStart = ctx.dp(26f)
+            })
         }
-        host.addView(tabs, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(12f) })
+        host.addView(tabs, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(4f) })
+        host.addView(View(ctx).apply { flat(Tokens.hairc, 1f) },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(1f)))
         // 区间导航
         val nav = hrow(ctx)
-        nav.setPadding(0, ctx.dp(12f), 0, 0)
-        nav.addView(btn(ctx, "‹", "n", small = true).also { it.setOnClickListener { off--; rerender(false) } })
-        nav.addView(label(ctx, label2, 15f, Tokens.ink, Tokens.weightH()).also {
-            it.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(8f) })
+        nav.gravity = Gravity.CENTER_VERTICAL
+        nav.setPadding(0, ctx.dp(18f), 0, ctx.dp(6f))
+        nav.addView(btn(ctx, "‹", "n", small = true).also { it.setOnClickListener { off--; rerender(false) } },
+            LinearLayout.LayoutParams(ctx.dp(38f), ctx.dp(38f)))
+        val period = label(ctx, label2, 16f, Tokens.ink, Tokens.weightM()).apply {
+            gravity = Gravity.CENTER
+            isClickable = true
+            setOnClickListener { if (off != 0) { off = 0; rerender(false) } }
+        }
+        nav.addView(period, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         nav.addView(btn(ctx, "›", "n", small = true).also {
             it.isEnabled = off < 0
-            it.alpha = if (off < 0) 1f else 0.35f
+            it.alpha = if (off < 0) 1f else 0.25f
             it.setOnClickListener { if (off < 0) { off++; rerender(false) } }
-        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.marginStart = ctx.dp(8f) })
+        }, LinearLayout.LayoutParams(ctx.dp(38f), ctx.dp(38f)))
         host.addView(nav)
         // 汇总
         val mins = LinkedHashMap<String, Int>()
@@ -357,18 +372,18 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
         val total = mins.values.sum()
         val active = mins.values.count { it > 0 }
         val learned = learnedIn(from, to)
-        val sum = card(host, 16f, 12)
-        val big = label(ctx, fmtDur(total), 30f, Tokens.ink, Tokens.weightH())
+        val sum = calendarBlock(host, 8)
+        val big = label(ctx, fmtDur(total), 34f, Tokens.ink, Tokens.weightH())
         sum.addView(big)
         sum.addView(muted(ctx, if (mode == "day") "学习章节 ${learned.size} 个" else "$active 天有学习 · 日均 ${fmtDur(if (active > 0) total / active else 0)} · 章节 ${learned.size} 个"),
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(4f) })
         // 图表
         if (mode == "week" || mode == "year") {
-            val items = ArrayList<Pair<String, Int>>()
+            val items = ArrayList<Triple<String, Int, Boolean>>()
             if (mode == "week") {
                 for (i in 0..6) {
                     val d = dayAt(from, i)
-                    items.add("一二三四五六日"[i].toString() + (if (fmt.format(d) == fmt.format(Date())) "·今" else "") to minutesOf(fmt.format(d)))
+                    items.add(Triple("一二三四五六日"[i].toString(), minutesOf(fmt.format(d)), fmt.format(d) == fmt.format(Date())))
                 }
             } else {
                 val y = Calendar.getInstance().apply { add(Calendar.YEAR, off) }.get(Calendar.YEAR)
@@ -378,33 +393,45 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
                     while (c2.get(Calendar.MONTH) == mth) {
                         v += minutesOf(fmt.format(c2.time)); c2.add(Calendar.DAY_OF_MONTH, 1)
                     }
-                    items.add("${mth + 1}" to v)
+                    items.add(Triple("${mth + 1}", v, y == Calendar.getInstance().get(Calendar.YEAR) && mth == Calendar.getInstance().get(Calendar.MONTH)))
                 }
             }
             val mx = items.maxOf { it.second }.coerceAtLeast(1)
             val bars = hrow(ctx)
-            bars.setPadding(0, ctx.dp(14f), 0, 0)
-            items.forEach { (l, v) ->
+            bars.clipChildren = false
+            items.forEach { (l, v, isNow) ->
                 val col = vcol(ctx)
                 col.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                col.addView(label(ctx, if (v > 0) shortDur(v) else "", 10.5f, Tokens.sub), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-                val fill = View(ctx)
-                val h = ctx.dp(6f) + (if (v > 0) (v.toFloat() / mx * 96f) else 0f)
-                fill.flat(if (v > 0) Tokens.pri else Tokens.withAlpha(Tokens.sub, 0.15f), 3f)
-                col.addView(fill, LinearLayout.LayoutParams(ctx.dp(14f), h.toInt()))
-                col.addView(label(ctx, l, 11f, Tokens.sub), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(4f) })
-                bars.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+                col.addView(label(ctx, if (v > 0) shortDur(v) else "", 10.5f, Tokens.sub),
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ctx.dp(14f)))
+                val bar = FrameLayout(ctx).apply {
+                    flat(Tokens.withAlpha(Tokens.pri, 0.07f), 3f)
+                }
+                if (v > 0) {
+                    val fillHeight = maxOf(ctx.dp(4f), (ctx.dp(100f) * v.toFloat() / mx).toInt())
+                    bar.addView(View(ctx).apply { flat(Tokens.withAlpha(Tokens.pri, 0.78f), 3f) },
+                        FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, fillHeight, Gravity.BOTTOM))
+                }
+                col.addView(bar, LinearLayout.LayoutParams(ctx.dp(22f), ctx.dp(100f)))
+                col.addView(label(ctx, l, 12f, if (isNow) Tokens.pri else Tokens.sub,
+                    if (isNow) Tokens.weightM() else 400),
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
+                bars.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).also {
+                    it.marginStart = if (bars.childCount > 0) ctx.dp(6f) else 0
+                })
             }
-            sum.addView(bars, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(150f)).also { it.topMargin = ctx.dp(10f) })
+            sum.addView(bars, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(168f)).also {
+                it.topMargin = ctx.dp(22f); it.bottomMargin = ctx.dp(26f)
+            })
         }
         if (mode == "month") {
             sum.addView(monthGrid(ctx, from), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(12f) })
         }
         // 明细
-        val log = card(host, 16f, 12)
+        val log = calendarBlock(host, 10)
         if (mode == "day") {
             val key = fmt.format(from)
-            log.addView(label(ctx, "当日学习", 15.5f, Tokens.ink, Tokens.weightH()))
+            log.addView(label(ctx, "当日学习", 13f, Tokens.sub, 400))
             val ids = learnedOn(key)
             if (ids.isEmpty()) log.addView(muted(ctx, "当天没有完成章节学习的记录。"), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
             ids.forEach { id ->
@@ -422,7 +449,7 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
                 }
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(12f) })
         } else {
-            log.addView(label(ctx, "这段时间的学习记录", 15.5f, Tokens.ink, Tokens.weightH()))
+            log.addView(label(ctx, "这段时间的学习记录", 13f, Tokens.sub, 400))
             val keys = ArrayList<String>()
             var i = 0
             while (i <= days) {
@@ -434,10 +461,12 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
             keys.reversed().take(12).forEach { k ->
                 val r = hrow(ctx)
-                r.addView(label(ctx, k.substring(5).replace("-", "月") + "日", 14f, Tokens.ink, Tokens.weightM()).also {
+                r.gravity = Gravity.CENTER_VERTICAL
+                r.setPadding(0, ctx.dp(14f), 0, ctx.dp(14f))
+                r.addView(label(ctx, k.substring(5).replace("-", "月") + "日", 15.5f, Tokens.ink, Tokens.weightM()).also {
                     it.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                r.addView(muted(ctx, fmtDur(minutesOf(k)) + (if (learnedOn(k).isNotEmpty()) " · ${learnedOn(k).size} 章" else "")))
+                r.addView(muted(ctx, fmtDur(minutesOf(k)) + (if (learnedOn(k).isNotEmpty()) " · ${learnedOn(k).size} 章" else ""), 13.5f))
                 r.isClickable = true
                 r.setOnClickListener {
                     val target = fmt.parse(k) ?: return@setOnClickListener
@@ -445,7 +474,9 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
                     off = dayOffset(target)
                     rerender(false)
                 }
-                log.addView(r, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
+                log.addView(r, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                log.addView(View(ctx).apply { flat(Tokens.hairc, 1f) },
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(1f)))
             }
         }
         log.addView(muted(ctx, "时长在阅读章节、复习、划线等学习页面自动记录；离开页面或 2 分钟无操作时暂停。"),
@@ -493,6 +524,15 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
         val c = Calendar.getInstance().apply { time = from }
         c.add(Calendar.DAY_OF_YEAR, i)
         return c.time
+    }
+
+    private fun calendarBlock(host: LinearLayout, top: Int): LinearLayout {
+        if (!Tokens.planet) return card(host, 16f, 12)
+        return vcol(act).also { panel ->
+            host.addView(panel, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).also { it.topMargin = act.dp(top.toFloat()) })
+        }
     }
 
     private fun dayOffset(target: Date): Int {
@@ -552,10 +592,15 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
             val v = minutesOf(key)
             val cell = vcol(ctx)
             cell.gravity = Gravity.CENTER
-            cell.flat(if (key == fmt.format(Date())) Tokens.priSoft else if (v > 0) Tokens.withAlpha(Tokens.pri, 0.07f) else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(8f).toFloat())
+            cell.minimumHeight = ctx.dp(52f)
+            if (Tokens.planet) cell.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            else cell.flat(if (key == fmt.format(Date())) Tokens.priSoft else if (v > 0) Tokens.withAlpha(Tokens.pri, 0.07f) else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(8f).toFloat())
             cell.setPadding(0, ctx.dp(6f), 0, ctx.dp(6f))
-            cell.addView(label(ctx, "$d", 13f, if (v > 0) Tokens.pri else Tokens.ink, if (v > 0) Tokens.weightM() else Tokens.weightB()))
-            if (v > 0) cell.addView(label(ctx, shortDur(v), 9.5f, Tokens.sub))
+            val hasStudy = v > 0 || learnedOn(key).isNotEmpty()
+            val active = key == fmt.format(Date())
+            cell.addView(label(ctx, "$d", 13f, if (active || hasStudy) Tokens.pri else Tokens.ink,
+                if (active) Tokens.weightH() else if (hasStudy) Tokens.weightM() else Tokens.weightB()))
+            cell.addView(label(ctx, if (v > 0) shortDur(v) else "", 10f, Tokens.sub))
             val mine = cell
             cell.isClickable = true
             cell.setOnClickListener { mode = "day"; off = dayOffset(day); rerender(false) }
@@ -565,7 +610,7 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
         cells.chunked(7).forEach { row ->
             val r = hrow(ctx)
             row.forEach { c2 ->
-                r.addView(c2, LinearLayout.LayoutParams(0, ctx.dp(42f), 1f).also { it.marginEnd = ctx.dp(3f); it.topMargin = ctx.dp(3f) })
+                r.addView(c2, LinearLayout.LayoutParams(0, ctx.dp(52f), 1f).also { it.marginEnd = ctx.dp(5f); it.topMargin = ctx.dp(5f) })
             }
             grid.addView(r)
         }
