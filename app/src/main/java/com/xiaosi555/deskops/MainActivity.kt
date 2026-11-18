@@ -270,7 +270,11 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                         val done = items.count { it.completed }
                         persistCourse(selectedCourse!!.copy(chapters = items.size, chapterItems = items, progress = if (items.isEmpty()) 0 else done * 100 / items.size))
                     },
-                    onDeleteChapter = { ch -> persistCourse(selectedCourse!!.copy(chapters = (selectedCourse!!.chapterItems.size - 1).coerceAtLeast(0), chapterItems = selectedCourse!!.chapterItems.filterNot { it.id == ch.id })) },
+                    onDeleteChapter = { ch ->
+                        val items = selectedCourse!!.chapterItems.filterNot { it.id == ch.id }
+                        val done = items.count { it.completed }
+                        persistCourse(selectedCourse!!.copy(chapters = items.size, chapterItems = items, progress = if (items.isEmpty()) 0 else done * 100 / items.size))
+                    },
                     onPlayMedia = { uri, chapterId -> media.firstOrNull { it.uri == uri }?.let {
                         selectedMedia = it; activeCourseId = selectedCourse!!.id; activeChapterId = chapterId
                         activeResumePosition = selectedCourse!!.chapterItems.firstOrNull { ch -> ch.id == chapterId }?.lastPositionMs ?: 0L
@@ -376,7 +380,8 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                     val old = selectedCourse!!
                     val ch = Chapter(editingChapter?.id ?: System.currentTimeMillis(), chapterTitle.trim(), chapterContent.trim(), chapterMediaUri, editingChapter?.completed ?: false, editingChapter?.lastPositionMs ?: 0L)
                     val items = if (editingChapter == null) old.chapterItems + ch else old.chapterItems.map { if (it.id == ch.id) ch else it }
-                    persistCourse(old.copy(chapters = items.size, chapterItems = items))
+                    val done = items.count { it.completed }
+                    persistCourse(old.copy(chapters = items.size, chapterItems = items, progress = if (items.isEmpty()) 0 else done * 100 / items.size))
                     showChapterEditor = false
                 }
             }) { Text("保存") }
@@ -429,7 +434,7 @@ private fun LearningHome(courses: List<Course>, media: List<DeskMedia>, sessions
                 }
             }
         }
-        item { StudyCalendarCard(sessions, surface, fg, sub, primary) }
+        item { StudyCalendarCard(sessions, courses, surface, fg, sub, primary) }
         item { SectionTitle("继续学习", fg) }
         if (courses.isEmpty()) item { EmptyCard("还没有课程", "创建课程，整理你的学习内容", surface, sub) }
         items(courses.take(4)) { c -> CourseCard(c, surface, fg, sub, primary) { open(c) } }
@@ -712,7 +717,7 @@ private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Co
 }
 
 @Composable
-private fun StudyCalendarCard(sessions: List<StudySession>, surface: Color, fg: Color, sub: Color, primary: Color) {
+private fun StudyCalendarCard(sessions: List<StudySession>, courses: List<Course>, surface: Color, fg: Color, sub: Color, primary: Color) {
     val calendar = java.util.Calendar.getInstance()
     val format = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     val days = (6 downTo 0).map { offset ->
@@ -741,7 +746,9 @@ private fun StudyCalendarCard(sessions: List<StudySession>, surface: Color, fg: 
                 }
             }
         }
-        Text("累计学习记录 " + sessions.size + " 次", color = sub, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp))
+        val weekSessions = sessions.filter { it.day in days && it.courseId != 0L }
+        val averageProgress = if (courses.isEmpty()) 0 else courses.map { it.progress.coerceIn(0, 100) }.average().toInt()
+        Text("近 7 天学习课程 " + weekSessions.map { it.courseId }.distinct().size + " 门 · 课程平均完成 " + averageProgress + "%", color = sub, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp))
     }
 }
 
