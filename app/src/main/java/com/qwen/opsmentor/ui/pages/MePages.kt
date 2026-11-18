@@ -441,9 +441,8 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
                 r.isClickable = true
                 r.setOnClickListener {
                     val target = fmt.parse(k) ?: return@setOnClickListener
-                    off = daysBetween(target, Date()).let { if (it > 0) -1 else 0 }
                     mode = "day"
-                    calOverride = target
+                    off = dayOffset(target)
                     rerender(false)
                 }
                 log.addView(r, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
@@ -453,16 +452,16 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(10f) })
     }
 
-    private var calOverride: Date? = null
-
     /** 区间：返回起止与标题 */
     private fun range(now: Calendar): Triple<Date, Date, String> {
-        calOverride?.let { d ->
-            calOverride = null
-            return Triple(d, d, SimpleDateFormat("yyyy年M月d日", Locale.CHINA).format(d))
-        }
         val c = now.clone() as Calendar
-        c.add(Calendar.DAY_OF_YEAR, off)
+        // 每种视图按自己的时间单位移动：日/周/月/年分别偏移，不把周/月误当成一天。
+        when (mode) {
+            "day" -> c.add(Calendar.DAY_OF_YEAR, off)
+            "week" -> c.add(Calendar.WEEK_OF_YEAR, off)
+            "month" -> c.add(Calendar.MONTH, off)
+            "year" -> c.add(Calendar.YEAR, off)
+        }
         return when (mode) {
             "day" -> Triple(c.time, c.time, SimpleDateFormat("yyyy年M月d日", Locale.CHINA).format(c.time))
             "month" -> {
@@ -496,10 +495,21 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
         return c.time
     }
 
+    private fun dayOffset(target: Date): Int {
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }
+        val selected = Calendar.getInstance().apply {
+            time = target
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }
+        return Math.round((selected.timeInMillis - today.timeInMillis) / 86400000.0).toInt()
+    }
+
     private fun daysBetween(a: Date, b: Date): Int =
         Math.round((b.time - a.time) / 86400000.0).toInt().coerceAtLeast(0)
 
-    private fun minutesOf(day: String): Int = (store.studyLog[day] ?: 0) + autoMinutes(day)
+    private fun minutesOf(day: String): Int = maxOf(store.studyLog[day] ?: 0, autoMinutes(day))
 
     /** 自动累计的分钟数（与人工校正值合并取较大者） */
     private fun autoMinutes(day: String): Int = store.bags.values.sumOf { bag ->
@@ -553,7 +563,7 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
             if (v > 0) cell.addView(label(ctx, shortDur(v), 9.5f, Tokens.sub))
             val mine = cell
             cell.isClickable = true
-            cell.setOnClickListener { mode = "day"; calOverride = day; rerender(false) }
+            cell.setOnClickListener { mode = "day"; off = dayOffset(day); rerender(false) }
             cells.add(mine)
         }
         while (cells.size % 7 != 0) cells.add(View(ctx))
