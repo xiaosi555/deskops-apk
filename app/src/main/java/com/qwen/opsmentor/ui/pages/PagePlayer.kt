@@ -199,7 +199,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         stopPlayer()
         app.reader?.stop()
         val src = MediaCourses.resolve(act, store.cur, ch)
-        if (src.isEmpty()) { Sheets.toast(ctx, "还没有连接文件"); rerender(false); return }
+        if (src.isEmpty()) { Sheets.toast(ctx, "还没有连接文件"); return }
         val uri = if (src.startsWith("/")) Uri.fromFile(File(src)) else Uri.parse(src)
         val co = Courses.find(store, store.cur)
         if (co.media == "video") {
@@ -275,7 +275,6 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         val idx = pack.ch.indexOfFirst { it.id == current()?.id }
         if (idx < 0) return
         val next = (idx + d).coerceIn(0, pack.ch.size - 1)
-        PagePlayer.curCh = pack.ch[next].id
         PagePlayer.curCh = pack.ch[next].id
         autoplayOnRender = true
         rerender(false)
