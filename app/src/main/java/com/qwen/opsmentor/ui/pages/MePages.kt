@@ -591,36 +591,64 @@ class PageSettings(act: Activity, app: App) : Page(act, app) {
         var row = hrow(ctx)
         c1.addView(grid, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) })
         Tokens.PALETTE.forEachIndexed { i, hex ->
-            val b = FrameLayout(ctx).apply {
-                flat(if (i == store.accent) Tokens.withAlpha(hex, 0.14f) else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(10f).toFloat())
-                isClickable = true
+            val selected = store.accent == i
+            val swatch = FrameLayout(ctx).apply {
+                flat(if (selected) Tokens.withAlpha(hex, 0.14f) else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(10f).toFloat())
             }
-            val dot = View(ctx).apply { flat(hex, 7f) }
-            b.addView(dot, FrameLayout.LayoutParams(ctx.dp(22f), ctx.dp(22f)).also { it.gravity = Gravity.CENTER })
-            val name = label(ctx, Tokens.PALETTE_NAMES[i], 10.5f, if (i == store.accent) Tokens.pri else Tokens.sub, if (i == store.accent) Tokens.weightM() else 400)
+            val dot = View(ctx).apply { flat(hex, 8f) }
+            swatch.addView(dot, FrameLayout.LayoutParams(ctx.dp(22f), ctx.dp(22f)).also { it.gravity = Gravity.CENTER })
+            val name = label(ctx, Tokens.PALETTE_NAMES[i], 11f, if (selected) Tokens.pri else Tokens.sub, if (selected) Tokens.weightM() else 400)
             name.gravity = Gravity.CENTER
-            val col = vcol(ctx)
-            col.gravity = Gravity.CENTER
-            col.addView(b, LinearLayout.LayoutParams(ctx.dp(52f), ctx.dp(44f)))
+            val col = vcol(ctx).apply { gravity = Gravity.CENTER }
+            col.addView(swatch, LinearLayout.LayoutParams(ctx.dp(52f), ctx.dp(44f)))
             col.addView(name)
             col.isClickable = true
             col.setOnClickListener {
                 store.accent = i
+                store.accentCustom = ""
                 store.save(); app.retheme(); rerender(false)
             }
-            if (i % 4 == 0) {
+            if (i % 3 == 0) {
                 row = hrow(ctx)
                 grid.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
-                    it.topMargin = ctx.dp(6f)
+                    it.topMargin = ctx.dp(8f)
                 })
             }
             row.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also {
                 if (row.childCount > 0) it.marginStart = ctx.dp(4f)
             })
-            if (i == Tokens.PALETTE.size - 1) repeat(3 - (row.childCount - 1)) {
-                row.addView(View(ctx), LinearLayout.LayoutParams(0, 1, 1f).also { it.marginStart = ctx.dp(4f) })
+        }
+        // HTML 支持自定义主色；输入六位 HEX 后由同一套令牌引擎派生所有辅助色。
+        val customRow = hrow(ctx)
+        grid.addView(customRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
+            it.topMargin = ctx.dp(8f)
+        })
+        val customSelected = store.accent == -1
+        val customHex = store.accentCustom.takeIf { it.matches(Regex("#[0-9a-fA-F]{6}")) } ?: "#00B56A"
+        val customColor = runCatching { Color.parseColor(customHex) }.getOrDefault(Tokens.pri)
+        val customSwatch = FrameLayout(ctx).apply {
+            flat(if (customSelected) Tokens.withAlpha(customColor, 0.16f) else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(10f).toFloat())
+        }
+        customSwatch.addView(View(ctx).apply { flat(customColor, 8f) },
+            FrameLayout.LayoutParams(ctx.dp(22f), ctx.dp(22f)).also { it.gravity = Gravity.CENTER })
+        val customName = label(ctx, "自定义", 11f, if (customSelected) Tokens.pri else Tokens.sub, if (customSelected) Tokens.weightM() else 400).apply { gravity = Gravity.CENTER }
+        val customCol = vcol(ctx).apply { gravity = Gravity.CENTER; isClickable = true }
+        customCol.addView(customSwatch, LinearLayout.LayoutParams(ctx.dp(52f), ctx.dp(44f)))
+        customCol.addView(customName)
+        customCol.setOnClickListener {
+            Sheets.prompt(ctx, "自定义主题色", store.accentCustom.ifBlank { "#00B56A" }, 7, "输入 #RRGGBB", "应用") { value ->
+                val hex = if (value.startsWith("#")) value else "#$value"
+                if (!hex.matches(Regex("#[0-9a-fA-F]{6}"))) {
+                    Sheets.toast(ctx, "请输入有效的六位 HEX 颜色，例如 #00B56A")
+                } else {
+                    store.accent = -1
+                    store.accentCustom = hex.uppercase()
+                    store.save(); app.retheme(); rerender(false)
+                }
             }
         }
+        customRow.addView(customCol, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        repeat(2) { customRow.addView(View(ctx), LinearLayout.LayoutParams(0, 1, 1f).also { it.marginStart = ctx.dp(4f) }) }
         // 外观
         val c2 = card(host, 16f, 10)
         c2.addView(label(ctx, "外观", 15.5f, Tokens.ink, Tokens.weightH()))
