@@ -60,6 +60,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     private lateinit var abActions: LinearLayout
     private lateinit var abEdit: View
     private lateinit var tabbar: LinearLayout
+    private lateinit var tabbarLine: View
     private lateinit var tabBarInner: LinearLayout
     private lateinit var mini: MiniBar
 
@@ -227,13 +228,15 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         root.addView(appbar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.gravity = Gravity.TOP })
 
         tabbar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        tabbarLine = View(this)
+        tabbar.addView(tabbarLine, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1f)))
         tabBarInner = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        tabbar.addView(tabBarInner, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(58f)))
+        tabbar.addView(tabBarInner, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(60f)))
         root.addView(tabbar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.gravity = Gravity.BOTTOM })
 
         mini = MiniBar(this, app) { nav(it) }
         root.addView(mini, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(58f)).also {
-            it.gravity = Gravity.BOTTOM; it.bottomMargin = dp(58f)
+            it.gravity = Gravity.BOTTOM; it.bottomMargin = dp(60f)
         })
 
         setContentView(root)
@@ -244,7 +247,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
             bottomPad = bars.bottom
             appbar.setPadding(0, topPad, 0, 0)
             tabbar.setPadding(0, 0, 0, bottomPad)
-            (mini.layoutParams as? FrameLayout.LayoutParams)?.bottomMargin = dp(58f) + bottomPad
+            (mini.layoutParams as? FrameLayout.LayoutParams)?.bottomMargin = dp(60f) + bottomPad
             layoutStage()
             insets
         }
@@ -267,7 +270,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         val onTab = tabs.containsKey(view)
         val lp = stage.layoutParams as FrameLayout.LayoutParams
         lp.topMargin = if (onTab) 0 else topPad + dp(56f)
-        lp.bottomMargin = dp(58f) + bottomPad
+        lp.bottomMargin = dp(60f) + bottomPad
         stage.layoutParams = lp
     }
 
@@ -431,7 +434,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
 
     private fun renderTabbar(onTab: Boolean) {
         tabBarInner.removeAllViews()
-        tabbar.flat(Tokens.l1, 0f)
+        tabbar.flat(if (Tokens.planet) Tokens.l2 else Tokens.l1, 0f)
+        tabbarLine.setBackgroundColor(if (Tokens.planet) Tokens.hairc else Tokens.withAlpha(Tokens.sub, 0.08f))
         tabs.forEach { (k, name) ->
             val sub = !onTab && view in profileSubs
             val on = k == view || (k == "profile" && sub) || (k == "profile" && onTab && view == "profile")
