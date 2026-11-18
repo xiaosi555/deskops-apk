@@ -8,6 +8,8 @@
   var utterances = Object.create(null);
   var nativeVoices = [];
   var nativeTtsReady = false;
+  var nativeTtsResolved = false;
+  var waitingUtterances = [];
   var nativeVoicesRequested = false;
   var originalSpeech = window.speechSynthesis || null;
   var OriginalUtterance = window.SpeechSynthesisUtterance || null;
@@ -55,7 +57,7 @@
       var parts = rel.split('/');
       var mod = folder && parts.length > 1 ? parts[0] : '';
       if (typeof window.toItem === 'function') return window.toItem(file, mod, rel);
-      return { file: file, fname: file.name, name: file.name.replace(/\\.[^.]+$/, ''),
+      return { file: file, fname: file.name, name: file.name.replace(/\.[^.]+$/, ''),
         rel: rel, size: file.size, mtime: file.lastModified, mod: mod };
     });
   }
@@ -131,8 +133,37 @@
         return { voiceURI: v.id || v.name || '', name: v.name || v.id || '系统语音',
           lang: v.lang || 'zh-CN', localService: true, default: false };
       });
+      nativeTtsResolved = true;
       dispatchVoiceChange();
-    }).catch(function () { nativeTtsReady = false; });
+      var waiting = waitingUtterances.splice(0);
+      waiting.forEach(function (utterance) { startSpeech(utterance); });
+    }).catch(function () {
+      nativeTtsReady = false;
+      nativeTtsResolved = true;
+      var waiting = waitingUtterances.splice(0);
+      waiting.forEach(function (utterance) { startSpeech(utterance); });
+    });
+  }
+
+  function startSpeech(utterance) {
+    var id = 'tts_' + (++requestSeq) + '_' + Date.now();
+    if (nativeTtsReady) {
+      utterances[id] = utterance;
+      try {
+        var voice = utterance.voice ? (utterance.voice.voiceURI || utterance.voice.name || '') : '';
+        window.AndroidMedia.speakTts(id, String(utterance.text || ''), Number(utterance.rate) || 1, voice);
+        return;
+      } catch (e) { delete utterances[id]; }
+    }
+    if (originalSpeech && OriginalUtterance) {
+      try {
+        var fallback = new OriginalUtterance(utterance.text || '');
+        fallback.lang = utterance.lang || 'zh-CN'; fallback.rate = utterance.rate || 1; fallback.pitch = utterance.pitch || 1;
+        fallback.onstart = utterance.onstart; fallback.onend = utterance.onend; fallback.onerror = utterance.onerror;
+        originalSpeech.speak(fallback); return;
+      } catch (e) { }
+    }
+    if (typeof utterance.onerror === 'function') utterance.onerror({ error: 'not-available' });
   }
 
   var speech = {
@@ -146,27 +177,12 @@
     speak: function (utterance) {
       if (!utterance) return;
       refreshVoices();
-      var id = 'tts_' + (++requestSeq) + '_' + Date.now();
-      if (nativeTtsReady) {
-        utterances[id] = utterance;
-        try {
-          var voice = utterance.voice ? (utterance.voice.voiceURI || utterance.voice.name || '') : '';
-          window.AndroidMedia.speakTts(id, String(utterance.text || ''), Number(utterance.rate) || 1, voice);
-          return;
-        } catch (e) { delete utterances[id]; }
-      }
-      if (originalSpeech && OriginalUtterance) {
-        try {
-          var fallback = new OriginalUtterance(utterance.text || '');
-          fallback.lang = utterance.lang || 'zh-CN'; fallback.rate = utterance.rate || 1; fallback.pitch = utterance.pitch || 1;
-          fallback.onstart = utterance.onstart; fallback.onend = utterance.onend; fallback.onerror = utterance.onerror;
-          originalSpeech.speak(fallback); return;
-        } catch (e) { }
-      }
-      if (typeof utterance.onerror === 'function') utterance.onerror({ error: 'not-available' });
+      if (!nativeTtsResolved) { waitingUtterances.push(utterance); return; }
+      startSpeech(utterance);
     },
     cancel: function () {
       utterances = Object.create(null);
+      waitingUtterances = [];
       try { window.AndroidMedia.stopTts(); } catch (e) { }
       try { if (originalSpeech && originalSpeech.cancel) originalSpeech.cancel(); } catch (e) { }
     },
@@ -184,7 +200,7 @@
     dispatchEvent: function () { return true; }
   };
   Object.defineProperties(speech, {
-    speaking: { get: function () { return Object.keys(utterances).length > 0; } },
+    speaking: { get: function () { return Object.keys(utterances).length > 0 || waitingUtterances.length > 0; } },
     pending: { get: function () { return false; } },
     paused: { get: function () { return false; } }
   });
