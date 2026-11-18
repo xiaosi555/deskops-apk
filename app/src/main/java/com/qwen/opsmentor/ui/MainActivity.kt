@@ -333,7 +333,10 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         (pages["my-marks"] as? PageMarks)?.let { if (it.inCourse()) { it.popCourse(); render(); return } }
         (pages["io"] as? PageIo)?.let { if (it.inDetail()) { it.popDetail(); render(); return } }
         selectionBar.close()
-        view = if (navStack.isNotEmpty()) navStack.removeAt(navStack.size - 1) else "mine"
+        val next = if (navStack.isNotEmpty()) navStack.removeAt(navStack.size - 1) else "mine"
+        if (view == "player" && next != "player") leavePlayer()
+        app.reader?.let { if (it.on && next != "today") it.stop() }
+        view = next
         layoutStage()
         render()
     }
