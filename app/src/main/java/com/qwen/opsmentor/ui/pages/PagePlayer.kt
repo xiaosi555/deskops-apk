@@ -244,6 +244,10 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                     paintPlay()
                     postTick()
                 }
+                setOnCompletionListener {
+                    paused = true
+                    paintPlay()
+                }
                 setOnErrorListener { _, _, _ -> Sheets.toast(ctx, "这个格式在当前设备上播放失败，建议用 mp4"); true }
             }
         } else {
@@ -261,6 +265,11 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                             .onFailure { paused = true; Sheets.toast(ctx, "音频启动失败") }
                         paintPlay()
                         postTick()
+                    }
+                    setOnCompletionListener {
+                        paused = true
+                        pendingAudioStart = false
+                        paintPlay()
                     }
                     setOnErrorListener { mp, _, _ ->
                         audioPrepared = false
@@ -378,6 +387,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                 if (d > 0) {
                     seek?.progress = (p * 1000L / d).toInt()
                     timeLabel?.text = "${fmt(p)} / ${fmt(d)}"
+                    if (isPlaying()) app.timer.poke(store)
                     val chapterId = activeChapterId
                     if (chapterId.isNotEmpty()) {
                         store.mediaPos["${store.cur}:${chapterId}"] = p.toLong()
