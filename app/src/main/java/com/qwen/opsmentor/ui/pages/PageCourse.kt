@@ -55,6 +55,8 @@ class PageCourse(act: Activity, app: App) : Page(act, app) {
         var descOrder = false
     }
 
+    private var planetBodyRendered = false
+
     override fun body(host: LinearLayout) {
         val ctx = act
         val co = Courses.find(app.store, app.store.cur)
@@ -118,6 +120,16 @@ class PageCourse(act: Activity, app: App) : Page(act, app) {
         host.addView(segs(due))
 
         val body = vcol(ctx)
+        if (planetBodyRendered && !Tokens.reducedMotion) {
+            body.alpha = 0f
+            body.translationY = ctx.dp(8f).toFloat()
+            body.post {
+                body.animate().alpha(1f).translationY(0f).setDuration(340L)
+                    .setInterpolator(android.view.animation.PathInterpolator(0.22f, 0.74f, 0.18f, 1f))
+                    .start()
+            }
+        }
+        planetBodyRendered = true
         host.addView(body)
         when (seg) {
             "chs" -> chapters(body)
