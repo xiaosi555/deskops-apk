@@ -367,7 +367,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     override fun onPageScroll(key: String, y: Int, threshold: Int) {
         if (tabs.containsKey(view)) return
         val solid = y > dp(threshold.toFloat())
-        appbar.setBackgroundColor(if (solid) Tokens.withAlpha(Tokens.l1, 0.92f) else Color.TRANSPARENT)
+        val appbarSurface = if (Tokens.planet) Tokens.l2 else Tokens.l1
+        appbar.setBackgroundColor(if (solid) Tokens.withAlpha(appbarSurface, if (Tokens.planet) 0.90f else 0.88f) else Color.TRANSPARENT)
         val planetCourse = Tokens.planet && view == "course"
         abTitleBox.alpha = if (planetCourse && y <= dp(150f)) 0f else 1f
         val p = pages[view] ?: return
