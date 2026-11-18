@@ -3,19 +3,48 @@ name: Android APK
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
+    if: ${{ !contains(github.event.head_commit.message || '', '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract Android source project
+        run: |
+          if [ ! -f "app/build.gradle.kts" ]; then
+            curl -fL "https://raw.githubusercontent.com/xiaosi555/deskops-apk/95f5abc1c0241efcde3eb82372e1e83fb6e6b0b1/%E6%A1%8C%E9%9D%A2%E8%BF%90%E7%BB%B4%E5%AD%A6%E4%B9%A0%E5%AF%BC%E5%B8%88-Android%E5%8E%9F%E7%94%9F%E5%B7%A5%E7%A8%8B.zip" -o /tmp/desktop-course-source.zip
+            mkdir -p /tmp/desktop-course-source
+            unzip -q /tmp/desktop-course-source.zip -d /tmp/desktop-course-source
+            cp -a /tmp/desktop-course-source/OpsMentor/. .
+            rm -rf /tmp/desktop-course-source /tmp/desktop-course-source.zip
+          fi
+
+          # Set the installed application name and WebP launcher icon.
+          sed -i 's#<string name="app_name">[^<]*</string>#<string name="app_name">桌面课程</string>#' app/src/main/res/values/strings.xml
+          sed -i 's#android:icon="@mipmap/ic_launcher"#android:icon="@drawable/app_icon"#' app/src/main/AndroidManifest.xml
+          sed -i 's#android:roundIcon="@mipmap/ic_launcher_round"#android:roundIcon="@drawable/app_icon"#' app/src/main/AndroidManifest.xml
+          mkdir -p app/src/main/res/drawable-nodpi
+          cp "400x400Icon.ApSiOS01-75.webp" app/src/main/res/drawable-nodpi/app_icon.webp
+          rm -rf app/src/main/res/mipmap-*
+
+          # Persist the extracted, organized source in the repository and remove any archive copy.
+          rm -f "桌面运维学习导师-Android原生工程.zip"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Extract Android source and configure 桌面课程 app [skip ci]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -26,17 +55,13 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android SDK 34
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.4'
-
-      - name: Prepare launcher icon from repository WebP
-        run: |
-          test -f "400x400Icon.ApSiOS01-75.webp"
-          mkdir -p app/src/main/res/drawable-nodpi
-          rm -f app/src/main/res/drawable/app_icon.xml
-          cp "400x400Icon.ApSiOS01-75.webp" app/src/main/res/drawable-nodpi/app_icon.webp
 
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
