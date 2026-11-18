@@ -6,7 +6,6 @@ import android.content.res.ColorStateList
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -154,8 +153,7 @@ fun hscroll(ctx: Context, content: View): HorizontalScrollView = HorizontalScrol
 fun View.installHtmlPressFeedback() {
     if (!isClickable || foreground != null) return
     if (this is android.widget.EditText || this is android.widget.SeekBar ||
-        this is android.view.SurfaceView || isLongClickable ||
-        (this is android.widget.TextView && textIsSelectable)) return
+        this is android.view.SurfaceView || isLongClickable) return
 
     val lp = layoutParams
     val roundMask = GradientDrawable().apply {
