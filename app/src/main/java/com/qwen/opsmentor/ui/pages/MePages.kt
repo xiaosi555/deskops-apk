@@ -1003,24 +1003,40 @@ class PageCourseImport(act: Activity, app: App) : Page(act, app) {
         c.addView(muted(ctx, "读取手机里的视频 / 音频文件夹建课：文件名即章节名，按名称自然排序（1、2、10 排在正确位置）。文件只在本机读取，不会上传。"))
         val row = btnRow(ctx)
         row.setPadding(0, ctx.dp(10f), 0, 0)
-        row.addView(btn(ctx, "选择文件夹", "pri").also {
-            it.setOnClickListener {
-                (act as MainActivity).pickTree { uri ->
-                    if (uri == null) return@pickTree
-                    val items = MediaCourses.scan(ctx, uri, kind)
-                    if (items.isEmpty()) { Sheets.toast(ctx, "没有在这个文件夹里找到${if (kind == "video") "视频" else "音频"}文件；可点下方「改选单个文件」"); return@pickTree }
-                    if (mediaTitle.isBlank()) mediaTitle = MediaCourses.displayName(ctx, uri)
-                    mediaTitle.let { t ->
-                        val id = MediaCourses.createCourse(app, kind, t.ifBlank { if (kind == "video") "视频课程" else "语音课程" }, items, glyph)
+        val folderButton = btn(ctx, "选择文件夹", "pri")
+        folderButton.setOnClickListener {
+            (act as MainActivity).pickTree { uri ->
+                if (uri == null) return@pickTree
+                folderButton.isEnabled = false
+                folderButton.alpha = 0.65f
+                Sheets.toast(ctx, "正在扫描文件夹，请稍候…")
+                Thread {
+                    val result = runCatching { MediaCourses.scan(ctx, uri, kind) }
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        folderButton.isEnabled = true
+                        folderButton.alpha = 1f
+                        val items = result.getOrElse {
+                            Sheets.toast(ctx, "文件夹读取失败，请检查授权后重试")
+                            return@post
+                        }
+                        if (items.isEmpty()) {
+                            Sheets.toast(ctx, "没有找到可用的${if (kind == "video") "视频" else "音频"}文件；可点下方「改选单个文件」")
+                            return@post
+                        }
+                        if (mediaTitle.isBlank()) mediaTitle = MediaCourses.displayName(ctx, uri)
+                        val title = mediaTitle.ifBlank { if (kind == "video") "视频课程" else "语音课程" }
+                        val id = MediaCourses.createCourse(app, kind, title, MediaCourses.sortItems(items, sortKey, sortAsc), glyph)
                         if (id != null) {
-                            store.cmTab = kind; store.save()
-                            Sheets.popCheck(ctx, "已导入${if (kind == "video") "视频" else "语音"}课程")
+                            store.cmTab = kind
+                            store.save()
+                            Sheets.popCheck(ctx, "已导入${if (kind == "video") "视频" else "语音"}课程 · ${items.size} 个文件")
                             (act as MainActivity).goBack()
                         } else Sheets.toast(ctx, "建课失败")
                     }
-                }
+                }.start()
             }
-        })
+        }
+        row.addView(folderButton)
         row.addView(btn(ctx, "改选单个文件", "n").also {
             it.setOnClickListener {
                 (act as MainActivity).pickMedia(kind) { uris ->
