@@ -213,7 +213,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         appbar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
         val abin = hrow(this)
         abin.setPadding(dp(8f), 0, dp(8f), 0)
-        abin.addView(iconBtn(this, "back", getString(R.string.cd_back), 36f) { goBack() })
+        abin.addView(iconBtn(this, "back", getString(R.string.cd_back), 40f) { goBack() })
         abTitleBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = dp(6f) }
@@ -223,7 +223,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         abin.addView(abActions)
         abEdit = iconBtn(this, "more", getString(R.string.cd_edit), 36f) { CourseEditor.open(this, app, currentCourse()) }
         abin.addView(abEdit)
-        appbar.addView(abin, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52f)))
+        appbar.addView(abin, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56f)))
         root.addView(appbar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.gravity = Gravity.TOP })
 
         tabbar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
