@@ -54,6 +54,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     // MediaPlayer.prepareAsync 完成前不读取 isPlaying / 不调用 start。
     private var audioPrepared = false
     private var pendingAudioStart = false
+    private var activeChapterId = ""
+    private var lastPositionSaveAt = 0L
     private var autoplayOnRender = false
 
     private fun current() = pack.chById(PagePlayer.curCh.ifBlank {
@@ -185,9 +187,23 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                 val item = MediaCourses.fromUris(ctx, uris, kind).firstOrNull() ?: return@pickMedia
                 val ch = current() ?: return@pickMedia
                 ch.media = com.qwen.opsmentor.data.MediaRef(kind, item.name, item.uri.toString(), item.size, ch.media?.dur ?: 0)
-                val uc = store.userCourses.firstOrNull { it.id == store.cur }
+                val courseId = store.cur
+                val uc = store.userCourses.firstOrNull { it.id == courseId }
                 uc?.let { it.packJson = pack.toJson().toString() }
-                store.save(); app.packs.put(store.cur, pack); rerender(true)
+                store.save()
+                app.packs.put(courseId, pack)
+                rerender(true)
+                if (store.mediaKeep) {
+                    Thread {
+                        val copied = MediaCourses.copyInto(ctx, app, courseId)
+                        handler.post {
+                            Sheets.toast(ctx, if (copied > 0) "文件已重新连接并保存到应用内" else "文件已连接，但内部复制失败；请检查存储空间")
+                            MediaCourses.probeDuration(ctx, app, courseId) {}
+                        }
+                    }.start()
+                } else {
+                    MediaCourses.probeDuration(ctx, app, courseId) {}
+                }
             }
         }
         box.addView(re, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) })
@@ -209,6 +225,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         val ctx = act
         stopPlayer()
         app.reader?.stop()
+        activeChapterId = ch.id
+        lastPositionSaveAt = android.os.SystemClock.elapsedRealtime()
         val src = MediaCourses.resolve(act, store.cur, ch)
         if (src.isEmpty()) { Sheets.toast(ctx, "还没有连接文件"); return }
         val uri = if (src.startsWith("/")) Uri.fromFile(File(src)) else Uri.parse(src)
@@ -360,8 +378,15 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                 if (d > 0) {
                     seek?.progress = (p * 1000L / d).toInt()
                     timeLabel?.text = "${fmt(p)} / ${fmt(d)}"
-                    val ch = current()
-                    if (ch != null) store.mediaPos["${store.cur}:${ch.id}"] = p.toLong()
+                    val chapterId = activeChapterId
+                    if (chapterId.isNotEmpty()) {
+                        store.mediaPos["${store.cur}:${chapterId}"] = p.toLong()
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (now - lastPositionSaveAt >= 5000L) {
+                            lastPositionSaveAt = now
+                            store.save()
+                        }
+                    }
                 }
                 handler.postDelayed(this, 500)
             }
@@ -376,9 +401,9 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
 
     private fun stopPlayer() {
         // 离开页面/切换章节前保留最后播放位置。
-        current()?.let { ch ->
+        if (activeChapterId.isNotEmpty()) {
             val p = position()
-            if (p > 0) store.mediaPos["${store.cur}:${ch.id}"] = p.toLong()
+            if (p > 0) store.mediaPos["${store.cur}:${activeChapterId}"] = p.toLong()
         }
         runCatching { video?.stopPlayback() }
         runCatching { if (audioPrepared) player?.stop() }
@@ -388,6 +413,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         pendingAudioStart = false
         preparedVideoPlayer = null
         paused = true
+        activeChapterId = ""
         ticker?.let { handler.removeCallbacks(it) }
         ticker = null
         runCatching { store.save() }
