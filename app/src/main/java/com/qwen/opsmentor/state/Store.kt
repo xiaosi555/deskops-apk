@@ -102,7 +102,9 @@ class Store(ctx: Context) {
     var bags: LinkedHashMap<String, Bag> = LinkedHashMap()
     // ---- ui ----
     var style: StyleMode = StyleMode.PLANET
-    var accent: Int = 0
+    var accent: Int = 4
+    var accentCustom: String = ""
+    var accentPaletteVersion: Int = 1
     var appearance: Appearance = Appearance.SYSTEM
     var deco: String = "lines"
     var star: LinkedHashMap<String, Int> = LinkedHashMap()
@@ -186,7 +188,14 @@ class Store(ctx: Context) {
             }
             o.optJSONObject("ui")?.let { u ->
                 style = if (u.optString("style", "planet") == "minimal") StyleMode.MINIMAL else StyleMode.PLANET
-                accent = u.optInt("accent", 0)
+                val savedAccent = u.optInt("accent", 0)
+                val savedPaletteVersion = u.optInt("accentPaletteVersion", 0)
+                accent = if (savedPaletteVersion == 0) when (savedAccent) {
+                    0 -> 4; 1 -> 1; 2 -> 2; 3 -> 3; 4 -> 5
+                    5 -> 4; 6 -> 3; 7 -> 4; 8 -> 6; else -> 4
+                } else savedAccent
+                accentCustom = u.optString("accentCustom", "")
+                accentPaletteVersion = 1
                 appearance = when (u.optString("appearance", "")) {
                     "light" -> Appearance.LIGHT; "dark" -> Appearance.DARK; else -> Appearance.SYSTEM
                 }
@@ -229,6 +238,8 @@ class Store(ctx: Context) {
         val u = JSONObject()
         u.put("style", if (style == StyleMode.MINIMAL) "minimal" else "planet")
         u.put("accent", accent)
+        u.put("accentCustom", accentCustom)
+        u.put("accentPaletteVersion", accentPaletteVersion)
         u.put("appearance", when (appearance) { Appearance.LIGHT -> "light"; Appearance.DARK -> "dark"; else -> "system" })
         u.put("deco", deco)
         u.put("star", JSONObject(star as Map<*, *>))
