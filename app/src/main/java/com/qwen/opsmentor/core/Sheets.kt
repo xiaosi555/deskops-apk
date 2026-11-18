@@ -285,6 +285,11 @@ object Sheets {
         ft.getChildAt(0).setOnClickListener { d.dismiss() }
         ft.getChildAt(1).setOnClickListener { d.dismiss(); onOk() }
         val wrap = FrameLayout(ctx)
+        wrap.setBackgroundColor(Tokens.scrim)
+        wrap.isClickable = true
+        wrap.setOnClickListener { d.dismiss() }
+        box.isClickable = true
+        box.setOnClickListener { /* consume backdrop click only inside dialog */ }
         val lp = FrameLayout.LayoutParams(ctx.dp(320f), ViewGroup.LayoutParams.WRAP_CONTENT)
         lp.gravity = Gravity.CENTER
         wrap.addView(box, lp)
@@ -308,6 +313,11 @@ object Sheets {
         col.addView(ft)
         val d = dialog(ctx)
         val wrap = FrameLayout(ctx)
+        wrap.setBackgroundColor(Tokens.scrim)
+        wrap.isClickable = true
+        wrap.setOnClickListener { d.dismiss() }
+        col.isClickable = true
+        col.setOnClickListener { /* consume backdrop click only inside dialog */ }
         val lp = FrameLayout.LayoutParams(ctx.dp(320f), ViewGroup.LayoutParams.WRAP_CONTENT)
         lp.gravity = Gravity.CENTER
         wrap.addView(col, lp)
@@ -392,6 +402,11 @@ object Sheets {
         sheet.add(noteBox(ctx, "这里只是预览：点「保存到本机」才会生成文件，直接关闭不会触发任何下载。", hint), t = 0)
         ((sheet.getChildAt(sheet.childCount - 1).layoutParams) as? LinearLayout.LayoutParams)?.setMargins(ctx.dp(16f), ctx.dp(6f), ctx.dp(16f), ctx.dp(16f))
         val wrap = FrameLayout(ctx)
+        wrap.setBackgroundColor(Tokens.scrim)
+        wrap.isClickable = true
+        wrap.setOnClickListener { d.dismiss() }
+        sheet.isClickable = true
+        sheet.setOnClickListener { /* consume backdrop click only inside export preview */ }
         val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(520f))
         lp.gravity = Gravity.CENTER
         wrap.addView(sheet, lp)
