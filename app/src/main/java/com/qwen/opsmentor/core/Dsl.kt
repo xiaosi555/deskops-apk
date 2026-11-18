@@ -2,6 +2,9 @@ package com.qwen.opsmentor.core
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
@@ -142,6 +145,40 @@ fun nested(ctx: Context, content: View): NestedScrollView = NestedScrollView(ctx
 fun hscroll(ctx: Context, content: View): HorizontalScrollView = HorizontalScrollView(ctx).apply {
     addView(content, ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
     isHorizontalScrollBarEnabled = false
+}
+
+
+// ---------------- HTML 风格按压反馈 ----------------
+
+/** 为普通可点击控件添加轻量主色水波；不接管输入、拖拽和文本选择手势。 */
+fun View.installHtmlPressFeedback() {
+    if (!isClickable || foreground != null) return
+    if (this is android.widget.EditText || this is android.widget.SeekBar ||
+        this is android.view.SurfaceView || isLongClickable ||
+        (this is android.widget.TextView && textIsSelectable)) return
+
+    val lp = layoutParams
+    val roundMask = GradientDrawable().apply {
+        shape = if (this@installHtmlPressFeedback is ImageView &&
+            lp != null && lp.width > 0 && lp.width == lp.height
+        ) GradientDrawable.OVAL else GradientDrawable.RECTANGLE
+        cornerRadius = context.dp(if (Tokens.planet) 8f else 12f).toFloat()
+        setColor(android.graphics.Color.WHITE)
+    }
+    foreground = RippleDrawable(
+        ColorStateList.valueOf(Tokens.withAlpha(Tokens.pri, 0.14f)),
+        null,
+        roundMask,
+    )
+}
+
+/** 递归处理页面中的可点击行、卡片、图标按钮，保持现有点击回调不变。 */
+fun ViewGroup.installHtmlPressFeedbackRecursively() {
+    for (index in 0 until childCount) {
+        val child = getChildAt(index)
+        child.installHtmlPressFeedback()
+        if (child is ViewGroup) child.installHtmlPressFeedbackRecursively()
+    }
 }
 
 // ---------------- 背景与描边 ----------------
