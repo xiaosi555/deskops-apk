@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import androidx.core.widget.NestedScrollView
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import com.qwen.opsmentor.state.LineType
 import com.qwen.opsmentor.state.MarkColor
@@ -47,7 +48,13 @@ object Sheets {
         val d = Dialog(ctx)
         d.requestWindowFeature(Window.FEATURE_NO_TITLE)
         d.window?.apply {
-            if (transparent) setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
+            if (transparent) {
+                setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
+                WindowCompat.setDecorFitsSystemWindows(this, false)
+                statusBarColor = android.graphics.Color.TRANSPARENT
+                navigationBarColor = android.graphics.Color.TRANSPARENT
+                addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+            }
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             if (!transparent) addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
@@ -150,7 +157,12 @@ object Sheets {
         val bodyCap = if (maxHeightPx > 0) minOf(maxHeightPx, htmlBodyCap) else htmlBodyCap
         val scroll = object : NestedScrollView(ctx) {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-                val cappedHeight = View.MeasureSpec.makeMeasureSpec(bodyCap, View.MeasureSpec.AT_MOST)
+                val parentCap = if (View.MeasureSpec.getMode(heightMeasureSpec) == View.MeasureSpec.UNSPECIFIED) {
+                    bodyCap
+                } else {
+                    minOf(bodyCap, View.MeasureSpec.getSize(heightMeasureSpec))
+                }
+                val cappedHeight = View.MeasureSpec.makeMeasureSpec(parentCap, View.MeasureSpec.AT_MOST)
                 super.onMeasure(widthMeasureSpec, cappedHeight)
             }
         }.apply {
