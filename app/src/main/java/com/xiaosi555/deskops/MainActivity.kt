@@ -229,7 +229,7 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                         title = { Text(if (page == "course") selectedCourse?.title ?: "课程" else when(tab) { "学习" -> "学习空间"; "课程" -> "课程管理"; "媒体" -> "媒体资料库"; else -> "我的" }, fontWeight = FontWeight.Bold, color = fg) },
                         navigationIcon = { if (page != "root") IconButton(onClick = { page = "root" }) { Icon(Icons.Rounded.ArrowBack, null, tint = fg) } },
                         actions = {
-                            if (tab == "课程" && page == "root") IconButton(onClick = { showAddCourse = true }) { Icon(Icons.Rounded.Add, "新建课程", tint = primary) }
+                            if (tab == "课程" && page == "root") IconButton(onClick = { editingCourse = null; courseTitle = ""; courseIntro = ""; showAddCourse = true }) { Icon(Icons.Rounded.Add, "新建课程", tint = primary) }
                             if (tab == "媒体" && page == "root") IconButton(onClick = { mediaPicker.launch(arrayOf("video/*", "audio/*")) }) { Icon(Icons.Rounded.Add, "导入媒体", tint = primary) }
                         },
                         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = bg)
@@ -275,11 +275,14 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                         val done = items.count { it.completed }
                         persistCourse(selectedCourse!!.copy(chapters = items.size, chapterItems = items, progress = if (items.isEmpty()) 0 else done * 100 / items.size))
                     },
-                    onPlayMedia = { uri, chapterId -> media.firstOrNull { it.uri == uri }?.let {
-                        selectedMedia = it; activeCourseId = selectedCourse!!.id; activeChapterId = chapterId
-                        activeResumePosition = selectedCourse!!.chapterItems.firstOrNull { ch -> ch.id == chapterId }?.lastPositionMs ?: 0L
-                        page = "player"
-                    } },
+                    onPlayMedia = { uri, chapterId ->
+                        val linkedMedia = media.firstOrNull { it.uri == uri }
+                        if (linkedMedia != null) {
+                            selectedMedia = linkedMedia; activeCourseId = selectedCourse!!.id; activeChapterId = chapterId
+                            activeResumePosition = selectedCourse!!.chapterItems.firstOrNull { ch -> ch.id == chapterId }?.lastPositionMs ?: 0L
+                            page = "player"
+                        } else Toast.makeText(context, "关联媒体已从资料库移除，请重新导入后编辑章节关联", Toast.LENGTH_LONG).show()
+                    },
                     onSaveHighlight = { ch ->
                         if (ch.content.isNotBlank()) {
                             highlights.add(Highlight(System.currentTimeMillis(), selectedCourse!!.id, ch.id, ch.content))
@@ -650,7 +653,11 @@ private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: C
             Spacer(Modifier.height(18.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 FilledTonalButton(onClick = { player.seekTo((player.currentPosition - 15000).coerceAtLeast(0)) }) { Icon(Icons.Rounded.Replay10, null); Text("-15秒") }
-                FilledTonalButton(onClick = { player.seekTo((player.currentPosition + 15000).coerceAtMost(player.duration.coerceAtLeast(0L))) }) { Icon(Icons.Rounded.Forward10, null); Text("+15秒") }
+                FilledTonalButton(onClick = {
+                    val target = player.currentPosition + 15000L
+                    val duration = player.duration
+                    player.seekTo(if (duration > 0L) target.coerceAtMost(duration) else target)
+                }) { Icon(Icons.Rounded.Forward10, null); Text("+15秒") }
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
