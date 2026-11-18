@@ -39,6 +39,8 @@ import java.io.File
 class PagePlayer(act: Activity, app: App) : Page(act, app) {
 
     override val key = "player"
+    // HTML 将 player 纳入 STUDY_VIEWS：播放课程时同样累计学习时长。
+    override val learning = true
     override fun title(): String = current()?.t ?: ""
 
     private var player: MediaPlayer? = null
