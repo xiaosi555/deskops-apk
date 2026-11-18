@@ -16,6 +16,8 @@ import com.qwen.opsmentor.core.dp
 import com.qwen.opsmentor.core.label
 import com.qwen.opsmentor.core.surface
 import com.qwen.opsmentor.core.flat
+import com.qwen.opsmentor.core.itemIn
+import com.qwen.opsmentor.core.installHtmlPressFeedbackRecursively
 import com.qwen.opsmentor.data.Chapter
 import com.qwen.opsmentor.data.Pack
 import com.qwen.opsmentor.state.Mark
@@ -62,8 +64,10 @@ abstract class Page(val act: Activity, val app: App) {
         val c = act
         val box = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            val pad = c.dp(16f)
-            setPadding(pad, 0, pad, c.dp(30f))
+            // HTML 星球版 stage 左右留白 20px；极简版为 16px
+            val pad = c.dp(if (Tokens.planet) 20f else 16f)
+            // HTML stage 底部预留 122px；原生容器已避开 60px 底栏，因此内容补足 62px。
+            setPadding(pad, 0, pad, c.dp(62f))
         }
         val owner = (c as? ScrollOwner)
         val sv = object : NestedScrollView(c) {
@@ -84,11 +88,19 @@ abstract class Page(val act: Activity, val app: App) {
     }
 
     /** 整页重绘；keepScroll=false 时回顶部（对应 Web 的 __readTop） */
-    fun rerender(toTop: Boolean = false) {
+    fun rerender(toTop: Boolean = false, animateItems: Boolean = false) {
         val box = content ?: return
         box.removeAllViews()
         blocks.clear()
         body(box)
+        // HTML 按压反馈：递归为可点击行 / 卡片补上主色水波，不改写原点击回调。
+        box.installHtmlPressFeedbackRecursively()
+        // HTML .stagger：页面进入时，一级内容按 30ms 起步错峰浮现。
+        if (animateItems && !Tokens.reducedMotion) {
+            for (index in 0 until box.childCount) {
+                box.getChildAt(index).itemIn((30L + index * 50L).coerceAtMost(390L))
+            }
+        }
         app.registerBlocks(blocks)
         app.reader?.load(readingSegs())
         val key = "$CUR:${posKey()}"
@@ -148,7 +160,7 @@ abstract class Page(val act: Activity, val app: App) {
     }
 
     /** 卡片容器 */
-    fun card(host: LinearLayout, padDp: Float = 14f, top: Int = 10): LinearLayout {
+    fun card(host: LinearLayout, padDp: Float = 16f, top: Int = 14): LinearLayout {
         val c = act
         val box = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL

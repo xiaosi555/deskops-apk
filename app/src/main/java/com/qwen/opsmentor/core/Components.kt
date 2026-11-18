@@ -239,11 +239,6 @@ class Table(private val ctx: Context) {
 
 /** 封面：课程图标 / 用户上传图片；星球版圆角 6、极简版 17 */
 object Covers {
-    private val GRADS = mapOf(
-        "cv-a" to intArrayOf(0xFF2F6FED.toInt(), 0xFF188A5C.toInt()),
-        "cv-b" to intArrayOf(0xFF7A5AF8.toInt(), 0xFF2F6FED.toInt()),
-    )
-
     fun view(ctx: Context, sizePx: Int, coverFile: String?, coverClass: String, glyph: String, round: Float = Tokens.rCover()): View {
         val v = android.widget.FrameLayout(ctx)
         v.layoutParams = LinearLayout.LayoutParams(sizePx, sizePx)
@@ -256,7 +251,12 @@ object Covers {
             if (bmp != null) img.setImageBitmap(bmp)
             v.flat(Tokens.priSoft, r)
         } else {
-            val colors = GRADS[coverClass] ?: intArrayOf(Tokens.pri, Tokens.withAlpha(Tokens.pri, 1f))
+            // HTML v6 将 cv-a / cv-b / cv-c 统一为同一组绿色课程封面渐变。
+            val colors = if (Tokens.dark) {
+                intArrayOf(0xFF2A9E5B.toInt(), 0xFF1F7D46.toInt())
+            } else {
+                intArrayOf(0xFF34C374.toInt(), 0xFF27AE60.toInt())
+            }
             val g = android.graphics.drawable.GradientDrawable()
             g.orientation = android.graphics.drawable.GradientDrawable.Orientation.TL_BR
             g.colors = colors
@@ -360,12 +360,39 @@ class DecoView(ctx: Context, private var kind: String, private val heightPx: Int
         val pri = Tokens.pri
         when (kind) {
             "lines" -> {
-                paint.color = Tokens.withAlpha(pri, if (Tokens.dark) 0.10f else 0.07f)
-                paint.strokeWidth = resources.displayMetrics.density
-                var x = w * 0.06f
-                while (x < w) {
-                    c.drawLine(x, 0f, x, h * (0.45f + 0.5f * ((x % 7f) / 7f)), paint)
-                    x += resources.displayMetrics.density * 26f
+                val density = resources.displayMetrics.density
+                paint.strokeWidth = density
+                if (Tokens.planet) {
+                    // HTML 星球版顶部纹理：两层 3px / 7px 细竖纹，向下柔和淡出。
+                    val lineTint = if (Tokens.dark) Tokens.mix(0xFFCDD5D1.toInt(), pri, 0.10f)
+                                   else Tokens.mix(0xFF7F8784.toInt(), pri, 0.12f)
+                    val colorsA = intArrayOf(
+                        Tokens.withAlpha(lineTint, 0.09f),
+                        Tokens.withAlpha(lineTint, 0.0765f),
+                        Tokens.withAlpha(lineTint, 0.036f),
+                        android.graphics.Color.TRANSPARENT,
+                    )
+                    val colorsB = intArrayOf(
+                        Tokens.withAlpha(lineTint, 0.06f),
+                        Tokens.withAlpha(lineTint, 0.051f),
+                        Tokens.withAlpha(lineTint, 0.024f),
+                        android.graphics.Color.TRANSPARENT,
+                    )
+                    val stops = floatArrayOf(0f, 0.40f, 0.76f, 1f)
+                    var x = 0f
+                    paint.shader = android.graphics.LinearGradient(0f, 0f, 0f, h, colorsA, stops, android.graphics.Shader.TileMode.CLAMP)
+                    while (x < w) { c.drawLine(x, 0f, x, h, paint); x += density * 3f }
+                    x = 0f
+                    paint.shader = android.graphics.LinearGradient(0f, 0f, 0f, h, colorsB, stops, android.graphics.Shader.TileMode.CLAMP)
+                    while (x < w) { c.drawLine(x, 0f, x, h, paint); x += density * 7f }
+                    paint.shader = null
+                } else {
+                    paint.color = Tokens.withAlpha(pri, if (Tokens.dark) 0.10f else 0.07f)
+                    var x = w * 0.06f
+                    while (x < w) {
+                        c.drawLine(x, 0f, x, h * (0.45f + 0.5f * ((x % 7f) / 7f)), paint)
+                        x += density * 26f
+                    }
                 }
             }
             "hair" -> {

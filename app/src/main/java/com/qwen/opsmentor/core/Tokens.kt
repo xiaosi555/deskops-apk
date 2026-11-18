@@ -42,15 +42,6 @@ object Tokens {
     )
     val PALETTE_NAMES = listOf("苔绿", "海盐蓝", "雾紫", "陶土", "灰蓝", "橄榄", "浅棕", "石墨", "樱粉")
 
-    private const val L0_L = 0xFFEFF3F0.toInt()
-    private const val L1_L = 0xFFF3F6F4.toInt()
-    private const val L2_L = 0xFFF9FBFA.toInt()
-    private const val L3_L = 0xFFFDFEFD.toInt()
-    private const val L0_D = 0xFF111512.toInt()
-    private const val L1_D = 0xFF151A16.toInt()
-    private const val L2_D = 0xFF1A201B.toInt()
-    private const val L3_D = 0xFF1F2621.toInt()
-
     fun refresh(store: Store, systemDark: Boolean) {
         dark = when (store.appearance) {
             Appearance.LIGHT -> false
@@ -61,22 +52,64 @@ object Tokens {
         accentIndex = store.accent.coerceIn(0, PALETTE.size - 1)
         val base = PALETTE[accentIndex]
         theme = if (dark) "dark" else "light"
-        pri = if (dark) mix(base, 0xFFFFFF, 0.14f) else base
-        onPri = if (ratioOn(pri) < 2.2f) 0xFF1B1D22.toInt() else 0xFFFFFFFF.toInt()
-        l0 = if (dark) L0_D else L0_L
-        l1 = if (dark) L1_D else L1_L
-        l2 = if (dark) L2_D else L2_L
-        l3 = if (dark) L3_D else L3_L
-        priSoft = mix(if (dark) L2_D else L2_L, pri, if (dark) 0.20f else 0.12f)
-        accentWash = mix(if (dark) L2_D else L2_L, pri, if (dark) 0.16f else 0.09f)
-        ink = if (dark) 0xFFDFE5EE.toInt() else 0xFF1E242C.toInt()
-        sub = if (dark) 0xFF8F9AA8.toInt() else 0xFF69737F.toInt()
-        ok = if (dark) 0xFF3FB37F.toInt() else 0xFF188A5C.toInt()
-        warn = if (dark) 0xFFD9A441.toInt() else 0xFFB8770F.toInt()
-        bad = if (dark) 0xFFE2776D.toInt() else 0xFFC4483F.toInt()
-        hairc = if (dark) 0x1AFFFFFF else 0x141E242C
-        scrim = if (dark) 0xCC000000.toInt() else 0x731B2228.toInt()
-        codeBg = if (dark) mix(L3_D, 0xFFFFFF, 0.05f) else 0xFFF5F7FA.toInt()
+        // HTML applyAccent() 直接使用九色板；暗色模式不再额外漂白主色。
+        pri = base
+        onPri = 0xFFFFFFFF.toInt()
+
+        // 与 HTML 最终级联后的 data-style / data-theme 变量逐项对应。
+        if (planet && !dark) {
+            l0 = mix(0xFFFFFFFF.toInt(), pri, 0.025f)
+            l1 = l0
+            l2 = 0xFFFFFFFF.toInt()
+            l3 = mix(0xFFFFFFFF.toInt(), pri, 0.06f)
+            ink = mix(0xFF0B1511.toInt(), pri, 0.16f)
+            sub = mix(0xFF6B7873.toInt(), pri, 0.30f)
+            priSoft = mix(0xFFFFFFFF.toInt(), pri, 0.11f)
+            accentWash = mix(0xFFFFFFFF.toInt(), pri, 0.07f)
+            hairc = mix(0xFFFFFFFF.toInt(), pri, 0.13f)
+        } else if (planet && dark) {
+            l0 = mix(0xFF0C0F12.toInt(), pri, 0.07f)
+            l1 = l0
+            l2 = mix(0xFF12161A.toInt(), pri, 0.09f)
+            l3 = mix(0xFF171C21.toInt(), pri, 0.13f)
+            ink = mix(0xFFEEF1F5.toInt(), pri, 0.08f)
+            sub = mix(0xFF98A1AB.toInt(), pri, 0.22f)
+            priSoft = mix(0xFF12161A.toInt(), pri, 0.17f)
+            accentWash = mix(0xFF12161A.toInt(), pri, 0.11f)
+            hairc = withAlpha(pri, 0.14f)
+        } else if (!dark) {
+            // HTML 极简版浅色主题
+            l0 = 0xFFF7F7F7.toInt()
+            l1 = 0xFFF7F7F7.toInt()
+            l2 = 0xFFFFFFFF.toInt()
+            l3 = 0xFFF2F2F2.toInt()
+            ink = 0xFF1C1D1F.toInt()
+            sub = 0xFF898C91.toInt()
+            priSoft = mix(0xFFFFFFFF.toInt(), pri, 0.06f)
+            accentWash = 0xFFF3F3F3.toInt()
+            hairc = 0x12000000
+        } else {
+            // HTML 极简版深色主题
+            l0 = 0xFF101112.toInt()
+            l1 = 0xFF131415.toInt()
+            l2 = 0xFF17181A.toInt()
+            l3 = 0xFF1F2022.toInt()
+            ink = 0xFFECEDED.toInt()
+            sub = 0xFF8E9196.toInt()
+            priSoft = mix(0xFF17181A.toInt(), pri, 0.12f)
+            accentWash = 0xFF1D1E20.toInt()
+            hairc = 0x14FFFFFF
+        }
+
+        // HTML v7 单色主题状态色：同样由主色派生。
+        ok = pri
+        warn = mix(0xFFFFFFFF.toInt(), pri, 0.70f)
+        bad = mix(0xFF1D2026.toInt(), pri, 0.74f)
+        scrim = if (planet) {
+            // HTML 星球版弹层遮罩：主色 12% 混入深色底，整体透明度约 49%。
+            withAlpha(mix(0xFF0A0E12.toInt(), pri, 0.245f), 0.49f)
+        } else 0x4719201B
+        codeBg = l3
     }
 
     var theme = "light"

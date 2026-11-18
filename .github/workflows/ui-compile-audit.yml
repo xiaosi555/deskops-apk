@@ -1,0 +1,53 @@
+name: UI design parity compile audit
+
+on:
+  push:
+    branches: [ui/html-design-parity]
+  workflow_dispatch:
+
+concurrency:
+  group: html-design-parity-compile
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  compile-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK 34
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.4'
+      - name: Kotlin compile check (no APK packaging)
+        run: gradle --no-daemon :app:compileDebugKotlin
+      - name: Kotlin source and resource checks
+        run: |
+          python3 tools/ktcheck.py app/src/main/java
+          python3 - <<'PY'
+          import json
+          import pathlib
+          import xml.etree.ElementTree as ET
+          root = pathlib.Path(".")
+          json.loads((root / "app/src/main/assets/course_ops.json").read_text(encoding="utf-8"))
+          for path in (root / "app/src/main").rglob("*.xml"):
+              ET.parse(path)
+          print("Kotlin structure, course JSON and XML resources passed.")
+          PY
+          git diff --check
+      - name: Android Lint
+        run: gradle --no-daemon :app:lintDebug

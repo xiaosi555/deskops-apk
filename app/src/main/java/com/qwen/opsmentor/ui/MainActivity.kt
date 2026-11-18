@@ -17,6 +17,8 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.net.Uri
+import androidx.activity.OnBackPressedCallback
+import android.view.animation.PathInterpolator
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -58,6 +60,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     private lateinit var abActions: LinearLayout
     private lateinit var abEdit: View
     private lateinit var tabbar: LinearLayout
+    private lateinit var tabbarLine: View
     private lateinit var tabBarInner: LinearLayout
     private lateinit var mini: MiniBar
 
@@ -211,7 +214,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         appbar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
         val abin = hrow(this)
         abin.setPadding(dp(8f), 0, dp(8f), 0)
-        abin.addView(iconBtn(this, "back", getString(R.string.cd_back), 36f) { goBack() })
+        abin.addView(iconBtn(this, "back", getString(R.string.cd_back), 40f) { goBack() })
         abTitleBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = dp(6f) }
@@ -221,27 +224,34 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         abin.addView(abActions)
         abEdit = iconBtn(this, "more", getString(R.string.cd_edit), 36f) { CourseEditor.open(this, app, currentCourse()) }
         abin.addView(abEdit)
-        appbar.addView(abin, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52f)))
-        root.addView(appbar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.gravity = Gravity.TOP })
+        appbar.addView(abin, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56f)))
+        root.addView(appbar, FrameLayout.LayoutParams(contentWidth(), ViewGroup.LayoutParams.WRAP_CONTENT).also {
+            it.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        })
 
         tabbar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        tabbarLine = View(this)
+        tabbar.addView(tabbarLine, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1f)))
         tabBarInner = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        tabbar.addView(tabBarInner, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(58f)))
+        tabbar.addView(tabBarInner, LinearLayout.LayoutParams(contentWidth(), dp(60f)).also {
+            it.gravity = Gravity.CENTER_HORIZONTAL
+        })
         root.addView(tabbar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.gravity = Gravity.BOTTOM })
 
         mini = MiniBar(this, app) { nav(it) }
         root.addView(mini, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(58f)).also {
-            it.gravity = Gravity.BOTTOM; it.bottomMargin = dp(58f)
+            it.gravity = Gravity.BOTTOM; it.bottomMargin = dp(60f)
         })
 
         setContentView(root)
+        installSystemBackHandler()
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             topPad = if (app.store.topInset) bars.top else 0
             bottomPad = bars.bottom
             appbar.setPadding(0, topPad, 0, 0)
             tabbar.setPadding(0, 0, 0, bottomPad)
-            (mini.layoutParams as? FrameLayout.LayoutParams)?.bottomMargin = dp(58f) + bottomPad
+            (mini.layoutParams as? FrameLayout.LayoutParams)?.bottomMargin = dp(60f) + bottomPad
             layoutStage()
             insets
         }
@@ -260,11 +270,41 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
 
     private fun currentCourse() = Courses.find(app.store, app.store.cur)
 
+    /** HTML .app / .stage 的 640px 最大内容宽度，手机全宽、平板居中。 */
+    private fun contentWidth(): Int = minOf(resources.displayMetrics.widthPixels, dp(640f))
+
+    /** 旋转屏幕 / 窗口尺寸变化后，保持 HTML 640px 应用画布居中。 */
+    private fun syncContentWidths() {
+        val width = contentWidth()
+        (deco.layoutParams as? FrameLayout.LayoutParams)?.let {
+            it.width = width
+            it.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            deco.layoutParams = it
+        }
+        (appbar.layoutParams as? FrameLayout.LayoutParams)?.let {
+            it.width = width
+            it.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            appbar.layoutParams = it
+        }
+        (mini.layoutParams as? FrameLayout.LayoutParams)?.let {
+            it.width = width
+            it.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            mini.layoutParams = it
+        }
+        (tabBarInner.layoutParams as? LinearLayout.LayoutParams)?.let {
+            it.width = width
+            it.gravity = Gravity.CENTER_HORIZONTAL
+            tabBarInner.layoutParams = it
+        }
+    }
+
     private fun layoutStage() {
         val onTab = tabs.containsKey(view)
         val lp = stage.layoutParams as FrameLayout.LayoutParams
-        lp.topMargin = if (onTab) 0 else topPad + dp(52f)
-        lp.bottomMargin = dp(58f) + bottomPad
+        lp.width = contentWidth()
+        lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        lp.topMargin = if (onTab) 0 else topPad + dp(56f)
+        lp.bottomMargin = dp(60f) + bottomPad
         stage.layoutParams = lp
     }
 
@@ -293,7 +333,10 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         (pages["my-marks"] as? PageMarks)?.let { if (it.inCourse()) { it.popCourse(); render(); return } }
         (pages["io"] as? PageIo)?.let { if (it.inDetail()) { it.popDetail(); render(); return } }
         selectionBar.close()
-        view = if (navStack.isNotEmpty()) navStack.removeAt(navStack.size - 1) else "mine"
+        val next = if (navStack.isNotEmpty()) navStack.removeAt(navStack.size - 1) else "mine"
+        if (view == "player" && next != "player") leavePlayer()
+        app.reader?.let { if (it.on && next != "today") it.stop() }
+        view = next
         layoutStage()
         render()
     }
@@ -327,7 +370,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     override fun onPageScroll(key: String, y: Int, threshold: Int) {
         if (tabs.containsKey(view)) return
         val solid = y > dp(threshold.toFloat())
-        appbar.setBackgroundColor(if (solid) Tokens.withAlpha(Tokens.l1, 0.92f) else Color.TRANSPARENT)
+        val appbarSurface = if (Tokens.planet) Tokens.l2 else Tokens.l1
+        appbar.setBackgroundColor(if (solid) Tokens.withAlpha(appbarSurface, if (Tokens.planet) 0.90f else 0.88f) else Color.TRANSPARENT)
         val planetCourse = Tokens.planet && view == "course"
         abTitleBox.alpha = if (planetCourse && y <= dp(150f)) 0f else 1f
         val p = pages[view] ?: return
@@ -377,6 +421,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
 
     fun render() {
         Tokens.refresh(app.store, resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES)
+        syncContentWidths()
         root.setBackgroundColor(Tokens.l0)
         if (Build.VERSION.SDK_INT >= 28) window.decorView.setBackgroundColor(Tokens.l0)
         WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -388,10 +433,24 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         val onTab = tabs.containsKey(view)
         val page = pages.getOrPut(view) { make(view) }
         val sv = page.ensure()
-        if (stage.childCount != 1 || stage.getChildAt(0) !== sv) {
+        val pageChanged = stage.childCount != 1 || stage.getChildAt(0) !== sv
+        if (pageChanged) {
             selectionBar.close()
             stage.removeAllViews()
             stage.addView(sv, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            // 对齐 HTML 的 pageIn：页面淡入并从下方轻移入场（380ms / --snap）
+            if (!Tokens.reducedMotion) {
+                sv.alpha = 0f
+                sv.translationY = dp(14f).toFloat()
+                sv.animate().cancel()
+                sv.animate().alpha(1f).translationY(0f)
+                    .setDuration(380L)
+                    .setInterpolator(PathInterpolator(0.22f, 0.74f, 0.18f, 1f))
+                    .start()
+            } else {
+                sv.alpha = 1f
+                sv.translationY = 0f
+            }
         }
         layoutStage()
         appbar.visibility = if (onTab) View.GONE else View.VISIBLE
@@ -406,7 +465,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         renderTabbar(onTab)
         com.qwen.opsmentor.core.Pages.locator = { m -> page.locate(m) }
         app.timer.onPage(view, page.learning)
-        page.rerender(toTop)
+        page.rerender(toTop, animateItems = pageChanged)
         toTop = false
         mini.render(view)
         updateReaderPill()
@@ -414,7 +473,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
 
     private fun renderTabbar(onTab: Boolean) {
         tabBarInner.removeAllViews()
-        tabbar.flat(Tokens.l1, 0f)
+        tabbar.flat(if (Tokens.planet) Tokens.l2 else Tokens.l1, 0f)
+        tabbarLine.setBackgroundColor(if (Tokens.planet) Tokens.hairc else Tokens.withAlpha(Tokens.sub, 0.08f))
         tabs.forEach { (k, name) ->
             val sub = !onTab && view in profileSubs
             val on = k == view || (k == "profile" && sub) || (k == "profile" && onTab && view == "profile")
@@ -430,10 +490,20 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
                 isClickable = true
                 layoutParams = LinearLayout.LayoutParams(0, dp(58f), 1f)
             }
-            b.addView(ImageView(this).apply {
+            val tabIcon = ImageView(this).apply {
                 setImageDrawable(Icons.get(this@MainActivity, icon, if (on) Tokens.pri else Tokens.sub))
                 scaleType = ImageView.ScaleType.FIT_CENTER
-            }, LinearLayout.LayoutParams(dp(23f), dp(23f)))
+            }
+            // HTML iconPop：当前 Tab 图标以 450ms 轻弹进入。
+            if (on && !Tokens.reducedMotion) {
+                tabIcon.scaleX = 0.55f
+                tabIcon.scaleY = 0.55f
+                tabIcon.animate().scaleX(1f).scaleY(1f)
+                    .setDuration(450L)
+                    .setInterpolator(PathInterpolator(0.32f, 1.34f, 0.5f, 1f))
+                    .start()
+            }
+            b.addView(tabIcon, LinearLayout.LayoutParams(dp(23f), dp(23f)))
             b.add(label(this, name, 10.5f, if (on) Tokens.pri else Tokens.sub, if (on) Tokens.weightM() else Tokens.weightB()), t = 2)
             b.setOnClickListener { nav(k) }
             tabBarInner.addView(b)
@@ -503,8 +573,25 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         app.retheme()
     }
 
-    override fun onBackPressed() {
-        if (selectionBar.isOpen() || view != "mine" || navStack.isNotEmpty()) goBack() else super.onBackPressed()
+    /**
+     * Android 系统返回键统一走应用路由栈：
+     * 先处理划线浮层 / 嵌套详情，再逐级返回上一个页面；
+     * 只有停留在「课程」根页且无历史页面时才退出 Activity。
+     * Dialog / BottomSheet 自身会先接收系统返回并关闭，不会跳过当前浮层。
+     */
+    private fun installSystemBackHandler() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (selectionBar.isOpen() || view != "mine" || navStack.isNotEmpty()) {
+                    goBack()
+                    return
+                }
+                // 根页面没有可返回的菜单，交还给系统执行退出。
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+                isEnabled = true
+            }
+        })
     }
 
     override fun onDestroy() {
