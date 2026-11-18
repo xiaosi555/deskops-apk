@@ -249,6 +249,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             topPad = if (app.store.topInset) bars.top else 0
             bottomPad = bars.bottom
+            pages.values.forEach { it.updateContentInsets() }
             appbar.setPadding(0, topPad, 0, 0)
             tabbar.setPadding(0, 0, 0, bottomPad)
             (mini.layoutParams as? FrameLayout.LayoutParams)?.bottomMargin = dp(60f) + bottomPad
