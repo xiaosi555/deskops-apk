@@ -180,7 +180,7 @@ class SelectionBar(private val act: Activity, private val app: App) {
         val root = act.findViewById<FrameLayout>(android.R.id.content) ?: return
         val loc = IntArray(2); v.getLocationInWindow(loc)
         val scr = IntArray(2); root.getLocationInWindow(scr)
-        val w = if (b.width > 0) b.width.toFloat() else app.dp(300f).toFloat().toFloat().toFloat().toFloat().toFloat()
+        val w = if (b.width > 0) b.width.toFloat() else app.dp(300f).toFloat().toFloat().toFloat().toFloat().toFloat().toFloat()
         val h = if (b.height > 0) b.height.toFloat() else app.dp(44f).toFloat()
         var x = if (app.store.barX >= 0) app.store.barX else (loc[0] - scr[0]).toFloat()
         var y = if (app.store.barY >= 0) app.store.barY else (loc[1] - scr[1] - h - app.dp(10f))
