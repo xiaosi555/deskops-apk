@@ -81,6 +81,7 @@ fun Pack.toJson(): JSONObject = JSONObject().apply {
             c.media?.let { put("media", JSONObject().put("kind", it.kind).put("fname", it.fname).put("rel", it.uri).put("size", it.size).put("dur", it.dur)) }
             c.media?.let { put("media", JSONObject().put("kind", it.kind).put("fname", it.fname).put("rel", it.uri).put("size", it.size).put("dur", it.dur)) }
             c.media?.let { put("media", JSONObject().put("kind", it.kind).put("fname", it.fname).put("rel", it.uri).put("size", it.size).put("dur", it.dur)) }
+            c.media?.let { put("media", JSONObject().put("kind", it.kind).put("fname", it.fname).put("rel", it.uri).put("size", it.size).put("dur", it.dur)) }
         }
     }))
     put("deep", JSONObject().apply {

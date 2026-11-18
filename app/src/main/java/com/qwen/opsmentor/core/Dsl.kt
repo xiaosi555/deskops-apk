@@ -118,7 +118,7 @@ fun ViewGroup.add(v: View, w: Int = ViewGroup.LayoutParams.MATCH_PARENT, h: Int 
     val d = context.resources.displayMetrics.density
     val lp = if (this is LinearLayout) LinearLayout.LayoutParams(w, h) else ViewGroup.LayoutParams(w, h)
     if (lp is LinearLayout.LayoutParams) lp.weight = weight
-    if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) lp.setMargins((l * d).toInt(), (t * d).toInt(), (r * d).toInt(), (b * d).toInt())
+    if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) if (lp is ViewGroup.MarginLayoutParams) lp.setMargins((l * d).toInt(), (t * d).toInt(), (r * d).toInt(), (b * d).toInt())
     addView(v, lp)
     return v
 }
