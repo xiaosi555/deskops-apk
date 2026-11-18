@@ -51,6 +51,7 @@ class PageMine(act: Activity, app: App) : Page(act, app) {
 
     override fun body(host: LinearLayout) {
         val ctx = act
+        if (Tokens.planet) host.setPadding(host.paddingLeft, ctx.dp(40f), host.paddingRight, host.paddingBottom)
         val orbit = iconBtn(ctx, "orbit", "课程管理", 40f) { nav("course-manage") }
         orbit.visibility = if (Tokens.planet) View.VISIBLE else View.GONE
         pageHead(host, "课程", orbit)
