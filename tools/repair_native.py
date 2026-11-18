@@ -433,3 +433,11 @@ def dedupe_media_serialization(s):
     return "\n".join(out)+"\n"
 edit("data/PackRegistry.kt", dedupe_media_serialization)
 print("Media serialization deduplication complete.")
+
+
+# Back navigation is consumed for in-app history, but exits normally at the root page.
+rep("ui/MainActivity.kt", [
+    ("    override fun onBackPressed() {\\n        goBack()\\n    }",
+     "    override fun onBackPressed() {\\n        if (selectionBar.isOpen() || view != \"mine\" || navStack.isNotEmpty()) goBack() else super.onBackPressed()\\n    }")
+])
+print("Back navigation lint fix complete.")
