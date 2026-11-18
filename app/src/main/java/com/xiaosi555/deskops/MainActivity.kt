@@ -719,7 +719,7 @@ private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Co
         item {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(surface).padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("数据管理", color = fg, fontWeight = FontWeight.SemiBold)
-                Text("完整备份课程章节、媒体索引、学习摘录与学习记录；更换手机前建议先导出备份。", color = sub, fontSize = 12.sp)
+                Text("备份课程章节、媒体文件索引、学习摘录与学习记录。媒体文件本身不会复制到备份中；更换手机后需重新导入媒体并重新关联。", color = sub, fontSize = 12.sp)
                 OutlinedButton(onClick = onExport, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Rounded.FileDownload, null); Spacer(Modifier.width(8.dp)); Text("导出完整学习数据") }
                 OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Rounded.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("导入学习数据备份") }
             }
