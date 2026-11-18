@@ -601,7 +601,19 @@ private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: C
             playWhenReady = true
         }
     }
-    DisposableEffect(player) { onDispose { onSession((android.os.SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L), player.currentPosition); player.release() } }
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                Toast.makeText(context, "媒体播放失败：" + (error.message ?: "格式不受支持或文件无法读取"), Toast.LENGTH_LONG).show()
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            onSession((android.os.SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L), player.currentPosition)
+            player.release()
+        }
+    }
     Column(modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, update = { it.player = player }, modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f))
         Column(Modifier.fillMaxWidth().background(Color(0xFF171923)).padding(18.dp)) {
@@ -609,10 +621,18 @@ private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: C
             Spacer(Modifier.height(7.dp))
             Text("Android 原生播放器 · Media3", color = Color(0xFFB6BAC8), fontSize = 12.sp)
             Spacer(Modifier.height(18.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FilledTonalButton(onClick = { player.seekTo((player.currentPosition - 15000).coerceAtLeast(0)) }) { Icon(Icons.Rounded.Replay10, null); Text("后退 15 秒") }
-                FilledTonalButton(onClick = { player.playbackParameters = player.playbackParameters.withSpeed(1f) }) { Text("恢复 1.0×") }
-                FilledTonalButton(onClick = { player.playbackParameters = player.playbackParameters.withSpeed(1.5f) }) { Text("1.5×") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                FilledTonalButton(onClick = { player.seekTo((player.currentPosition - 15000).coerceAtLeast(0)) }) { Icon(Icons.Rounded.Replay10, null); Text("-15秒") }
+                FilledTonalButton(onClick = { player.seekTo((player.currentPosition + 15000).coerceAtMost(player.duration.coerceAtLeast(0L))) }) { Icon(Icons.Rounded.Forward10, null); Text("+15秒") }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
+                listOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
+                    val selected = kotlin.math.abs(player.playbackParameters.speed - speed) < 0.01f
+                    TextButton(onClick = { player.playbackParameters = player.playbackParameters.withSpeed(speed) }, modifier = Modifier.weight(1f)) {
+                        Text(speed.toString() + "×", color = if (selected) primary else Color.White)
+                    }
+                }
             }
         }
     }
