@@ -926,6 +926,27 @@ class PageCourseImport(act: Activity, app: App) : Page(act, app) {
     private var sortKey = "name"
     private var sortAsc = true
 
+    /** 媒体导入后按设置保存应用内副本，并探测时长；所有文件 IO 均在后台执行。 */
+    private fun finishMediaImport(courseId: String, kind: String, count: Int) {
+        val ctx = act
+        if (store.mediaKeep) {
+            Sheets.toast(ctx, "课程已建立，正在保存媒体到应用内…")
+            Thread {
+                val copied = runCatching { MediaCourses.copyInto(ctx, app, courseId) }.getOrDefault(0)
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    if (copied >= count) {
+                        Sheets.toast(ctx, "已保存 $copied 个文件到应用内，可离线播放")
+                    } else {
+                        Sheets.toast(ctx, "已保存 $copied / $count 个文件；未保存的文件仍保留原位置")
+                    }
+                    MediaCourses.probeDuration(ctx, app, courseId) {}
+                }
+            }.start()
+        } else {
+            MediaCourses.probeDuration(ctx, app, courseId) {}
+        }
+    }
+
     override fun body(host: LinearLayout) {
         val ctx = act
         val tabs = hrow(ctx)
@@ -1030,6 +1051,7 @@ class PageCourseImport(act: Activity, app: App) : Page(act, app) {
                             store.cmTab = kind
                             store.save()
                             Sheets.popCheck(ctx, "已导入${if (kind == "video") "视频" else "语音"}课程 · ${items.size} 个文件")
+                            finishMediaImport(id, kind, items.size)
                             (act as MainActivity).goBack()
                         } else Sheets.toast(ctx, "建课失败")
                     }
@@ -1046,6 +1068,7 @@ class PageCourseImport(act: Activity, app: App) : Page(act, app) {
                     if (id != null) {
                         store.cmTab = kind; store.save()
                         Sheets.popCheck(ctx, "已导入${items.size} 个文件")
+                        finishMediaImport(id, kind, items.size)
                         (act as MainActivity).goBack()
                     }
                 }
