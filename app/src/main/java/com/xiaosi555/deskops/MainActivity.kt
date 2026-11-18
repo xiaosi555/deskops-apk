@@ -282,7 +282,24 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                         onAdd = { editingCourse = null; courseTitle = ""; courseIntro = ""; showAddCourse = true },
                         onEdit = { editingCourse = it; courseTitle = it.title; courseIntro = it.intro; showAddCourse = true },
                         onDelete = { deleteCourseTarget = it })
-                    "媒体" -> MediaLibrary(media, Modifier.padding(padding), fg, sub, surface, primary, onPlay = { activeCourseId = 0L; activeChapterId = 0L; activeResumePosition = 0L; selectedMedia = it; page = "player" }, onImportFiles = { mediaPicker.launch(arrayOf("video/*", "audio/*")) }, onImportFolder = { folderPicker.launch(null) }, onRemove = { item -> media.remove(item); prefs.edit().putString("media", writeMedia(media)).apply() })
+                    "媒体" -> MediaLibrary(media, Modifier.padding(padding), fg, sub, surface, primary,
+                        onPlay = { activeCourseId = 0L; activeChapterId = 0L; activeResumePosition = 0L; selectedMedia = it; page = "player" },
+                        onImportFiles = { mediaPicker.launch(arrayOf("video/*", "audio/*")) },
+                        onImportFolder = { folderPicker.launch(null) },
+                        onRemove = { item -> media.remove(item); prefs.edit().putString("media", writeMedia(media)).apply() },
+                        onCreateCourse = { selected, kind ->
+                            if (selected.isNotEmpty()) {
+                                val now = System.currentTimeMillis()
+                                val chapters = selected.mapIndexed { index, item ->
+                                    Chapter(now + index, item.name.substringBeforeLast('.', item.name), "", item.uri)
+                                }
+                                val title = (if (kind == "音频") "音频课程 · " else "视频课程 · ") + java.text.SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(java.util.Date(now))
+                                val course = Course(now, title, "由媒体资料库导入，共 " + chapters.size + " 个章节", chapters.size, 0, chapters)
+                                courses.add(course); prefs.edit().putString("courses", writeCourses(courses)).apply()
+                                selectedCourse = course; tab = "课程"; page = "course"
+                                Toast.makeText(context, "已创建课程，章节按当前排序排列", Toast.LENGTH_LONG).show()
+                            }
+                        })
                     else -> SettingsScreen(themeChoice, darkMode, Modifier.padding(padding), fg, sub, surface, primary,
                         onTheme = { themeChoice = it; prefs.edit().putInt("theme", it).apply() },
                         onDark = { darkMode = it; prefs.edit().putBoolean("dark", it).apply() },
@@ -512,9 +529,11 @@ private fun CourseDetail(
 }
 
 @Composable
-private fun MediaLibrary(media: List<DeskMedia>, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, onPlay: (DeskMedia) -> Unit, onImportFiles: () -> Unit, onImportFolder: () -> Unit, onRemove: (DeskMedia) -> Unit) {
+private fun MediaLibrary(media: List<DeskMedia>, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, onPlay: (DeskMedia) -> Unit, onImportFiles: () -> Unit, onImportFolder: () -> Unit, onRemove: (DeskMedia) -> Unit, onCreateCourse: (List<DeskMedia>, String) -> Unit) {
     var sortByTime by remember { mutableStateOf(false) }
+    var mediaKind by remember { mutableStateOf("视频") }
     val sortedMedia = if (sortByTime) media.sortedByDescending { it.addedAt } else media.sortedBy { it.name.lowercase() }
+    val filteredMedia = sortedMedia.filter { if (mediaKind == "音频") isAudioMedia(it) else !isAudioMedia(it) }
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(surface).padding(17.dp)) {
@@ -536,7 +555,22 @@ private fun MediaLibrary(media: List<DeskMedia>, modifier: Modifier, fg: Color, 
             }
         }
         if (media.isEmpty()) item { EmptyCard("还没有媒体文件", "选择文件或文件夹导入视频、音频", surface, sub) }
-        items(sortedMedia, key = { it.uri }) { item ->
+        item {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(surface).padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("课程导入类型", color = fg, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { mediaKind = "视频" }) { Text("视频", color = if (mediaKind == "视频") primary else sub) }
+                    TextButton(onClick = { mediaKind = "音频" }) { Text("音频", color = if (mediaKind == "音频") primary else sub) }
+                }
+                Text("当前筛选 " + filteredMedia.size + " 个文件，创建后会按上方排序生成章节。", color = sub, fontSize = 12.sp)
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { onCreateCourse(filteredMedia, mediaKind) }, enabled = filteredMedia.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Rounded.LibraryAdd, null); Spacer(Modifier.width(7.dp)); Text("将这些文件生成" + mediaKind + "课程")
+                }
+            }
+        }
+        items(filteredMedia, key = { it.uri }) { item ->
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).background(surface).clickable { onPlay(item) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(primary.copy(alpha = .12f)), contentAlignment = Alignment.Center) { Icon(if (item.mime.startsWith("audio")) Icons.Rounded.Headphones else Icons.Rounded.PlayArrow, null, tint = primary) }
                 Spacer(Modifier.width(12.dp))
@@ -677,6 +711,11 @@ private fun SectionTitle(title: String, action: String, fg: Color) { Row(vertica
 private fun StatText(label: String, value: String) { Column { Text(value, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold); Text(label, color = Color.White.copy(alpha = .75f), fontSize = 12.sp) } }
 @Composable
 private fun EmptyCard(title: String, detail: String, surface: Color, sub: Color) { Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(surface).padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Rounded.Inbox, null, tint = sub, modifier = Modifier.size(30.dp)); Spacer(Modifier.height(9.dp)); Text(title, fontWeight = FontWeight.SemiBold); Text(detail, color = sub, fontSize = 12.sp) } }
+
+private fun isAudioMedia(item: DeskMedia): Boolean {
+    val ext = item.name.substringAfterLast('.', "").lowercase()
+    return item.mime.startsWith("audio/") || ext in setOf("mp3", "m4a", "aac", "wav", "flac", "ogg", "opus", "wma")
+}
 
 private fun queryDisplayName(context: android.content.Context, uri: Uri): String? {
     return try { context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null } } catch (_: Exception) { null }
