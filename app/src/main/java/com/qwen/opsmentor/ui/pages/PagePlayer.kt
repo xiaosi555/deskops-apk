@@ -194,8 +194,10 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     private fun playable(ch: com.qwen.opsmentor.data.Chapter): Boolean {
         if (ch.media == null) return false
         val path = MediaCourses.resolve(act, store.cur, ch)
-        return if (path.startsWith("/")) File(path).exists() else runCatching {
-            act.contentResolver.openInputStream(Uri.parse(path))?.close()
+        return if (path.startsWith("/")) File(path).isFile && File(path).canRead() else runCatching {
+            val input = act.contentResolver.openInputStream(Uri.parse(path))
+                ?: throw IllegalStateException("媒体 URI 无法打开")
+            input.use { }
             true
         }.getOrDefault(false)
     }
