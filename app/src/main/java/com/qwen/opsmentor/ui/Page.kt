@@ -257,6 +257,13 @@ abstract class Page(val act: Activity, val app: App) {
             val p = c.dp(11f)
             setPadding(p, p, p, p)
             flat(if (Tokens.planet) Tokens.l3 else Tokens.withAlpha(Tokens.ink, 0.04f), c.dp(10f).toFloat())
+            setOnFocusChangeListener { _, focused ->
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(if (Tokens.planet) Tokens.l3 else Tokens.withAlpha(Tokens.ink, 0.04f))
+                    cornerRadius = c.dp(10f).toFloat()
+                    if (focused) setStroke(c.dp(1f), Tokens.accentLine)
+                }
+            }
             addTextChangedListener(watcher(onChange))
         }
         (host as android.view.ViewGroup).addView(inp, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
