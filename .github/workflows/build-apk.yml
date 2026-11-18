@@ -2,8 +2,6 @@ name: Build Native Android APK
 
 on:
   workflow_dispatch:
-  push:
-    branches: [native-android-rebuild]
 
 permissions:
   contents: read
