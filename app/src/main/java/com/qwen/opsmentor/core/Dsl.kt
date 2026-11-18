@@ -44,16 +44,25 @@ fun View.animatePop() {
 
 /** 条目入场：itemIn（淡入 + 上移 8dp），支持错峰 delay */
 fun View.itemIn(delay: Long = 0) {
-    if (Tokens.reducedMotion) return
-    val set = AnimationSet(false)
-    val a = android.view.animation.AlphaAnimation(0f, 1f)
-    val t = TranslateAnimation(0f, 0f, context.dp(8f).toFloat(), 0f)
-    a.duration = 240; t.duration = 240
-    t.interpolator = SNAP
-    set.addAnimation(a); set.addAnimation(t)
-    set.startOffset = delay
-    set.fillAfter = true
-    startAnimation(set)
+    if (Tokens.reducedMotion) {
+        alpha = 1f; translationY = 0f; scaleX = 1f; scaleY = 1f
+        return
+    }
+    // HTML @keyframes itemIn：460ms 淡入、上移 14px，并轻微回正缩放。
+    animate().cancel()
+    alpha = 0f
+    translationY = context.dp(14f).toFloat()
+    scaleX = 0.985f
+    scaleY = 0.985f
+    animate()
+        .alpha(1f)
+        .translationY(0f)
+        .scaleX(1f)
+        .scaleY(1f)
+        .setStartDelay(delay)
+        .setDuration(460L)
+        .setInterpolator(SNAP)
+        .start()
 }
 
 /** 数字滚动：850ms 三次缓出 */
