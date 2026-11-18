@@ -44,8 +44,15 @@ object Importer {
         if (t.isEmpty()) return Parsed(JSONObject(), "内容为空", fileName = fileName)
         if (t.startsWith("{") || t.startsWith("[")) {
             val o = try {
-                val x = JSONObject(t)
-                if (x.has("courses") || x.has("app")) x else if (x.length() == 1 && x.optJSONArray("array") != null) JSONObject().put("courses", x.getJSONArray("array")) else JSONObject().put("courses", JSONArray(listOf(x)))
+                if (t.startsWith("[")) {
+                    // 支持直接导入课程对象数组，不要把 JSON 数组误交给 JSONObject 解析。
+                    JSONObject().put("courses", JSONArray(t))
+                } else {
+                    val x = JSONObject(t)
+                    if (x.has("courses") || x.has("app")) x
+                    else if (x.length() == 1 && x.optJSONArray("array") != null) JSONObject().put("courses", x.getJSONArray("array"))
+                    else JSONObject().put("courses", JSONArray().put(x))
+                }
             } catch (e: Exception) {
                 return Parsed(JSONObject(), "JSON 格式不正确：${e.message?.take(40) ?: "无法解析"}", fileName = fileName)
             }
