@@ -417,3 +417,19 @@ def reader_cleanup(s):
     return final_idempotence_cleanup(s)
 edit("ui/MainActivity.kt", reader_cleanup)
 print("Idempotence cleanup complete.")
+
+
+# Keep media metadata serialization idempotent across every repair/validation run.
+def dedupe_media_serialization(s):
+    lines=s.splitlines()
+    out=[]
+    found=False
+    for line in lines:
+        if "c.media?.let" in line:
+            if found:
+                continue
+            found=True
+        out.append(line)
+    return "\n".join(out)+"\n"
+edit("data/PackRegistry.kt", dedupe_media_serialization)
+print("Media serialization deduplication complete.")
