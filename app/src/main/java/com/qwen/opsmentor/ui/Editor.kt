@@ -123,6 +123,8 @@ object CourseEditor {
         Sheets.confirm(act, "删除「" + Courses.meta(app.store, co).first + "」及它的进度、划线与案例？无法恢复。", "删除课程", "删除", true) {
             Sheets.closeAll()
             if (Courses.delete(app.store, co.id, app.packs)) {
+                // 只删除 app 私有媒体副本；原始文件夹 / SAF 文件保持不变。
+                com.qwen.opsmentor.media.MediaCourses.deleteLocal(act, app.store, co.id)
                 Sheets.toast(act, "课程已删除")
                 app.rerender?.invoke()
             }
