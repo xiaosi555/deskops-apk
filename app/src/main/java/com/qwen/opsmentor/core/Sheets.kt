@@ -150,7 +150,7 @@ object Sheets {
         val bodyCap = if (maxHeightPx > 0) minOf(maxHeightPx, htmlBodyCap) else htmlBodyCap
         val scroll = object : NestedScrollView(ctx) {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-                val cappedHeight = MeasureSpec.makeMeasureSpec(bodyCap, MeasureSpec.AT_MOST)
+                val cappedHeight = View.MeasureSpec.makeMeasureSpec(bodyCap, View.MeasureSpec.AT_MOST)
                 super.onMeasure(widthMeasureSpec, cappedHeight)
             }
         }.apply {
@@ -173,6 +173,13 @@ object Sheets {
         } else {
             sh.addView(View(ctx), LinearLayout.LayoutParams(1, insetBottom(ctx)))
         }
+        // 全屏 Dialog 的内容本身覆盖整屏，setCanceledOnTouchOutside 无法识别遮罩点击，
+        // 因此由遮罩容器显式关闭，Sheet 本体拦截空白区域点击。
+        wrap.setBackgroundColor(Tokens.scrim)
+        wrap.isClickable = true
+        wrap.setOnClickListener { d.dismiss() }
+        sh.isClickable = true
+        sh.setOnClickListener { /* consume backdrop click only inside the sheet */ }
         val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         lp.gravity = Gravity.BOTTOM
         wrap.addView(sh, lp)
