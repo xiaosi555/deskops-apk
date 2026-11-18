@@ -76,20 +76,12 @@ jobs:
           script: |
             adb logcat -c
             adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb shell am start -W -n com.xiaosi555.deskops/.MainActivity
-            for i in $(seq 1 30); do
-              if adb logcat -d -s DeskOpsSmoke:I | grep -q "APP_PAGE_READY"; then break; fi
-              sleep 2
-            done
-            LOG="$(adb logcat -d -s DeskOpsSmoke:I)"
-            echo "$LOG"
-            echo "$LOG" | grep -q "APP_PAGE_READY"
-            echo "$LOG" | grep -q '"bridge":true'
-            echo "$LOG" | grep -q '"mediaPicker":true'
-            echo "$LOG" | grep -q '"mediaImport":true'
-            echo "$LOG" | grep -q '"tts":true'
-            echo "$LOG" | grep -q '"back":true'
-            if adb logcat -d -s AndroidRuntime:E | grep -q "FATAL EXCEPTION"; then
-              echo "Android runtime crash detected"
-              exit 1
-            fi
+            adb shell am start -n com.xiaosi555.deskops/.MainActivity
+            sleep 45
+            adb logcat -d -s DeskOpsSmoke:I | grep -q "APP_PAGE_READY"
+            adb logcat -d -s DeskOpsSmoke:I | grep -q '"bridge":true'
+            adb logcat -d -s DeskOpsSmoke:I | grep -q '"mediaPicker":true'
+            adb logcat -d -s DeskOpsSmoke:I | grep -q '"mediaImport":true'
+            adb logcat -d -s DeskOpsSmoke:I | grep -q '"tts":true'
+            adb logcat -d -s DeskOpsSmoke:I | grep -q '"back":true'
+            ! adb logcat -d -s AndroidRuntime:E | grep -q "FATAL EXCEPTION"
