@@ -33,10 +33,10 @@ jobs:
 
       - name: Prepare launcher icon from repository WebP
         run: |
+          test -f "400x400Icon.ApSiOS01-75.webp"
           mkdir -p app/src/main/res/drawable-nodpi
-          if [ -f "400x400Icon.ApSiOS01-75.webp" ]; then
-            cp "400x400Icon.ApSiOS01-75.webp" app/src/main/res/drawable-nodpi/app_icon.webp
-          fi
+          rm -f app/src/main/res/drawable/app_icon.xml
+          cp "400x400Icon.ApSiOS01-75.webp" app/src/main/res/drawable-nodpi/app_icon.webp
 
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
