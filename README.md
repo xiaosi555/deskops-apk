@@ -180,3 +180,8 @@ Android 外壳负责启动本地 HTML、启用 JavaScript 与 DOM Storage、通�
 ## 七、项目定位
 
 本应用主要用于桌面运维知识学习、IT 支持技能训练、个人学习进度管理与运维知识沉淀。它是学习辅助工具，不会自动连接或管理企业域控、终端设备、网络设备，也不会代替真实生产环境中的运维操作与权限审批。
+
+
+## Android JavaScript structure
+
+The original interface markup and CSS remain in `app/src/main/assets/index.html` to preserve the existing layout and DOM behavior. Inline application code has been extracted, in original execution order, into ten standalone JavaScript files under `app/src/main/assets/js/`: content data, annotation and IO, app shell, learning views, app services, and five later extension layers. They remain classic scripts loaded in order because the existing application shares top-level state across layers; blindly converting them to ES modules would change scope and break behavior. Android-only file/media/TTS integration remains isolated in `android-bridge.js` and the native `MainActivity` bridge. The APK workflow syntax-checks every JS file before building.
