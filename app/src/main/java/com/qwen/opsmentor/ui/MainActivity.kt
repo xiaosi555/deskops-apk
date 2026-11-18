@@ -273,6 +273,31 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     /** HTML .app / .stage 的 640px 最大内容宽度，手机全宽、平板居中。 */
     private fun contentWidth(): Int = minOf(resources.displayMetrics.widthPixels, dp(640f))
 
+    /** 旋转屏幕 / 窗口尺寸变化后，保持 HTML 640px 应用画布居中。 */
+    private fun syncContentWidths() {
+        val width = contentWidth()
+        (deco.layoutParams as? FrameLayout.LayoutParams)?.let {
+            it.width = width
+            it.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            deco.layoutParams = it
+        }
+        (appbar.layoutParams as? FrameLayout.LayoutParams)?.let {
+            it.width = width
+            it.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            appbar.layoutParams = it
+        }
+        (mini.layoutParams as? FrameLayout.LayoutParams)?.let {
+            it.width = width
+            it.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            mini.layoutParams = it
+        }
+        (tabBarInner.layoutParams as? LinearLayout.LayoutParams)?.let {
+            it.width = width
+            it.gravity = Gravity.CENTER_HORIZONTAL
+            tabBarInner.layoutParams = it
+        }
+    }
+
     private fun layoutStage() {
         val onTab = tabs.containsKey(view)
         val lp = stage.layoutParams as FrameLayout.LayoutParams
@@ -392,6 +417,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
 
     fun render() {
         Tokens.refresh(app.store, resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES)
+        syncContentWidths()
         root.setBackgroundColor(Tokens.l0)
         if (Build.VERSION.SDK_INT >= 28) window.decorView.setBackgroundColor(Tokens.l0)
         WindowCompat.getInsetsController(window, window.decorView).apply {
