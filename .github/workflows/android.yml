@@ -28,7 +28,6 @@ jobs:
             rm -rf /tmp/desktop-course-source /tmp/desktop-course-source.zip
           fi
 
-          # Set the installed application name and WebP launcher icon.
           sed -i 's#<string name="app_name">[^<]*</string>#<string name="app_name">桌面课程</string>#' app/src/main/res/values/strings.xml
           sed -i 's#android:icon="@mipmap/ic_launcher"#android:icon="@drawable/app_icon"#' app/src/main/AndroidManifest.xml
           sed -i 's#android:roundIcon="@mipmap/ic_launcher_round"#android:roundIcon="@drawable/app_icon"#' app/src/main/AndroidManifest.xml
@@ -36,7 +35,6 @@ jobs:
           cp "400x400Icon.ApSiOS01-75.webp" app/src/main/res/drawable-nodpi/app_icon.webp
           rm -rf app/src/main/res/mipmap-*
 
-          # Persist the extracted, organized source in the repository and remove any archive copy.
           rm -f "桌面运维学习导师-Android原生工程.zip"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -54,9 +52,11 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install Android SDK 34
-        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
