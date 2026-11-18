@@ -451,3 +451,24 @@ def fix_back_navigation(s):
     return s.replace(old, new)
 edit("ui/MainActivity.kt", fix_back_navigation)
 print("Back navigation fix applied.")
+
+
+# Final source-quality fixes, implemented with chr(10) to avoid escaped-newline mismatches.
+def fix_back_navigation(s):
+    nl = chr(10)
+    old = "    override fun onBackPressed() {" + nl + "        goBack()" + nl + "    }"
+    new = "    override fun onBackPressed() {" + nl + "        if (selectionBar.isOpen() || view != \"mine\" || navStack.isNotEmpty()) goBack() else super.onBackPressed()" + nl + "    }"
+    return s.replace(old, new)
+edit("ui/MainActivity.kt", fix_back_navigation)
+def dedupe_media_lines(s):
+    out=[]
+    seen=False
+    for line in s.splitlines():
+        if "c.media?.let" in line:
+            if seen:
+                continue
+            seen=True
+        out.append(line)
+    return chr(10).join(out)+chr(10)
+edit("data/PackRegistry.kt", dedupe_media_lines)
+print("Final source-quality fixes complete.")
