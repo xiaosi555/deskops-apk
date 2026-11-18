@@ -113,6 +113,8 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
     var activeChapterId by remember { mutableLongStateOf(0L) }
     var activeResumePosition by remember { mutableLongStateOf(0L) }
     var showAddCourse by remember { mutableStateOf(false) }
+    var editingCourse by remember { mutableStateOf<Course?>(null) }
+    var deleteCourseTarget by remember { mutableStateOf<Course?>(null) }
     var showChapterEditor by remember { mutableStateOf(false) }
     var editingChapter by remember { mutableStateOf<Chapter?>(null) }
     var chapterTitle by remember { mutableStateOf("") }
@@ -275,7 +277,11 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
                 )
                 page == "root" -> when(tab) {
                     "学习" -> LearningHome(courses, media, sessions, Modifier.padding(padding), fg, sub, surface, primary) { c -> selectedCourse = c; page = "course" }
-                    "课程" -> CourseList(courses, Modifier.padding(padding), fg, sub, surface, primary, onOpen = { selectedCourse = it; page = "course" }, onAdd = { showAddCourse = true })
+                    "课程" -> CourseList(courses, Modifier.padding(padding), fg, sub, surface, primary,
+                        onOpen = { selectedCourse = it; page = "course" },
+                        onAdd = { editingCourse = null; courseTitle = ""; courseIntro = ""; showAddCourse = true },
+                        onEdit = { editingCourse = it; courseTitle = it.title; courseIntro = it.intro; showAddCourse = true },
+                        onDelete = { deleteCourseTarget = it })
                     "媒体" -> MediaLibrary(media, Modifier.padding(padding), fg, sub, surface, primary, onPlay = { activeCourseId = 0L; activeChapterId = 0L; activeResumePosition = 0L; selectedMedia = it; page = "player" }, onImportFiles = { mediaPicker.launch(arrayOf("video/*", "audio/*")) }, onImportFolder = { folderPicker.launch(null) }, onRemove = { item -> media.remove(item); prefs.edit().putString("media", writeMedia(media)).apply() })
                     else -> SettingsScreen(themeChoice, darkMode, Modifier.padding(padding), fg, sub, surface, primary,
                         onTheme = { themeChoice = it; prefs.edit().putInt("theme", it).apply() },
@@ -290,6 +296,26 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
             }
         }
     }
+
+    if (deleteCourseTarget != null) AlertDialog(
+        onDismissRequest = { deleteCourseTarget = null },
+        title = { Text("删除课程？") },
+        text = { Text("删除后课程章节和本地学习进度将从应用中移除，此操作无法撤销。") },
+        confirmButton = {
+            TextButton(onClick = {
+                val target = deleteCourseTarget!!
+                courses.removeAll { it.id == target.id }
+                highlights.removeAll { it.courseId == target.id }
+                sessions.removeAll { it.courseId == target.id }
+                prefs.edit().putString("courses", writeCourses(courses))
+                    .putString("highlights", LearningDataCodec.encodeHighlights(highlights))
+                    .putString("sessions", LearningDataCodec.encodeSessions(sessions)).apply()
+                if (selectedCourse?.id == target.id) { selectedCourse = null; page = "root" }
+                deleteCourseTarget = null
+            }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = { TextButton(onClick = { deleteCourseTarget = null }) { Text("取消") } }
+    )
 
     if (showChapterEditor && selectedCourse != null) AlertDialog(
         onDismissRequest = { showChapterEditor = false },
@@ -329,7 +355,7 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
 
     if (showAddCourse) AlertDialog(
         onDismissRequest = { showAddCourse = false },
-        title = { Text("新建课程") },
+        title = { Text(if (editingCourse == null) "新建课程" else "编辑课程") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(courseTitle, { courseTitle = it }, label = { Text("课程名称") }, singleLine = true)
@@ -339,13 +365,20 @@ private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<St
         confirmButton = {
             TextButton(onClick = {
                 if (courseTitle.isNotBlank()) {
-                    courses.add(Course(System.currentTimeMillis(), courseTitle.trim(), courseIntro.trim()))
+                    val editing = editingCourse
+                    if (editing == null) courses.add(Course(System.currentTimeMillis(), courseTitle.trim(), courseIntro.trim()))
+                    else {
+                        val updated = editing.copy(title = courseTitle.trim(), intro = courseIntro.trim())
+                        val index = courses.indexOfFirst { it.id == editing.id }
+                        if (index >= 0) courses[index] = updated
+                        if (selectedCourse?.id == editing.id) selectedCourse = updated
+                    }
                     prefs.edit().putString("courses", writeCourses(courses)).apply()
-                    courseTitle = ""; courseIntro = ""; showAddCourse = false
+                    editingCourse = null; courseTitle = ""; courseIntro = ""; showAddCourse = false
                 }
             }) { Text("创建") }
         },
-        dismissButton = { TextButton(onClick = { showAddCourse = false }) { Text("取消") } }
+        dismissButton = { TextButton(onClick = { showAddCourse = false; editingCourse = null }) { Text("取消") } }
     )
 }
 
@@ -376,11 +409,19 @@ private fun LearningHome(courses: List<Course>, media: List<DeskMedia>, sessions
 }
 
 @Composable
-private fun CourseList(courses: List<Course>, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, onOpen: (Course) -> Unit, onAdd: () -> Unit) {
+private fun CourseList(courses: List<Course>, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, onOpen: (Course) -> Unit, onAdd: () -> Unit, onEdit: (Course) -> Unit, onDelete: (Course) -> Unit) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("我的课程", fontSize = 23.sp, fontWeight = FontWeight.Bold, color = fg); Text("${courses.size} 门课程", color = sub, fontSize = 13.sp) }; FilledTonalButton(onClick = onAdd) { Icon(Icons.Rounded.Add, null); Text("新建") } } }
         if (courses.isEmpty()) item { EmptyCard("还没有课程", "点击右上角新建课程", surface, sub) }
-        items(courses) { CourseCard(it, surface, fg, sub, primary) { onOpen(it) } }
+        items(courses, key = { it.id }) { course ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { CourseCard(course, surface, fg, sub, primary) { onOpen(course) } }
+                Column {
+                    IconButton(onClick = { onEdit(course) }) { Icon(Icons.Rounded.Edit, "编辑课程", tint = primary) }
+                    IconButton(onClick = { onDelete(course) }) { Icon(Icons.Rounded.DeleteOutline, "删除课程", tint = sub) }
+                }
+            }
+        }
     }
 }
 
