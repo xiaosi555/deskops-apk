@@ -129,7 +129,7 @@ class SelectionBar(private val act: Activity, private val app: App) {
             box.addView(View(ctx).apply {
                 background = TyPreview(t.id, Tokens.ink)
             }, FrameLayout.LayoutParams(ctx.dp(22f), ctx.dp(14f)).also { it.gravity = Gravity.CENTER })
-            box.setOnClickListener { curTy = t.id; paintSwatches(); animatePop() }
+            box.setOnClickListener { curTy = t.id; paintSwatches(); box.animatePop() }
             bar.addView(box)
             tyViews.add(t.id to box)
         }
@@ -145,7 +145,7 @@ class SelectionBar(private val act: Activity, private val app: App) {
             }
             box.addView(View(ctx).apply { circle(Color.parseColor(c.hex)) },
                 FrameLayout.LayoutParams(ctx.dp(17f), ctx.dp(17f)).also { it.gravity = Gravity.CENTER })
-            box.setOnClickListener { curCo = c.id; paintSwatches(); animatePop() }
+            box.setOnClickListener { curCo = c.id; paintSwatches(); box.animatePop() }
             bar.addView(box)
             coViews.add(c.id to box)
         }
@@ -180,7 +180,7 @@ class SelectionBar(private val act: Activity, private val app: App) {
         val root = act.findViewById<FrameLayout>(android.R.id.content) ?: return
         val loc = IntArray(2); v.getLocationInWindow(loc)
         val scr = IntArray(2); root.getLocationInWindow(scr)
-        val w = if (b.width > 0) b.width.toFloat() else app.dp(300f)
+        val w = if (b.width > 0) b.width.toFloat() else app.dp(300f).toFloat()
         val h = if (b.height > 0) b.height.toFloat() else app.dp(44f).toFloat()
         var x = if (app.store.barX >= 0) app.store.barX else (loc[0] - scr[0]).toFloat()
         var y = if (app.store.barY >= 0) app.store.barY else (loc[1] - scr[1] - h - app.dp(10f))

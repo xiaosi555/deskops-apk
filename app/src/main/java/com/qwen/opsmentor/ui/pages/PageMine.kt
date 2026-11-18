@@ -67,9 +67,7 @@ class PageMine(act: Activity, app: App) : Page(act, app) {
         val box = hrow(ctx)
         box.surface(Tokens.l2, 14f, if (Tokens.planet) 0f else 1f, true)
         box.setPadding(ctx.dp(13f), ctx.dp(11f), ctx.dp(9f), ctx.dp(11f))
-        (box.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
-            it.topMargin = ctx.dp(10f)
-        })
+        box.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(10f) }
         box.addView(Icons.iconView(ctx, "search", Tokens.sub, 19f))
         val inp = EditText(ctx).apply {
             hint = "搜索课程、章节、关键词"

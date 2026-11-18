@@ -260,7 +260,7 @@ class PageCourse(act: Activity, app: App) : Page(act, app) {
         t.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(24f)))
         t.addView(label(ctx, label2, 12.5f, Tokens.ink, Tokens.weightM()), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
         t.isClickable = true
-        t.setOnClickListener { animatePop(); onClick() }
+        t.setOnClickListener { t.animatePop(); onClick() }
         return t
     }
 

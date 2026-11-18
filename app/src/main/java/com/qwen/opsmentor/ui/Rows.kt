@@ -323,7 +323,7 @@ object Bars {
             val r = hrow(ctx)
             row.forEach { (v, k) ->
                 val cell = vcol(ctx)
-                cell.flat(if (Tokens.planet) Tokens.l2 else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(Tokens.rInner()).toFloat()
+                cell.flat(if (Tokens.planet) Tokens.l2 else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(Tokens.rInner()).toFloat())
                 val p = ctx.dp(10f)
                 cell.setPadding(p, p, p, p)
                 cell.addView(label(ctx, v, 19f, Tokens.ink, Tokens.weightH()))

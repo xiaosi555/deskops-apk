@@ -173,7 +173,7 @@ object ShortcutsEdit {
         if (!isNew) {
             val del = btn(ctx, "删除这个入口", "danger", small = true)
             del.setOnClickListener {
-                Sheets.confirm(ctx, "删除「${s.name.ifBlank { "未命名" }}」？", "删除入口", "删除", true) {
+                Sheets.confirm(ctx, "删除「${name.ifBlank { "未命名" }}」？", "删除入口", "删除", true) {
                     list.removeAt(idx); app.store.save(); app.rerender?.invoke()
                     Sheets.closeAll()
                 }

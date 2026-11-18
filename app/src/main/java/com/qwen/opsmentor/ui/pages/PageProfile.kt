@@ -137,10 +137,9 @@ class PageProfile(act: Activity, app: App) : Page(act, app) {
         val body = vcol(act, padH = 16)
         body.addView(label(act, "本应用是纯本地应用：进度、划线、案例库、术语手册与个人信息保存在本机，不联网、不上传、无账号体系。", 14f, Tokens.ink))
         body.addView(muted(act, "更换设备或清理数据前，请先在「数据」页导出一份完整档案。"), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(10f) })
-        body.addView(label(act, "查看完整数据说明与导入导出入口 ›", 13.5f, Tokens.pri, Tokens.weightM()),
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(12f) }).also {
-            it.setOnClickListener { nav("io") }
-        }
+        val link = label(act, "查看完整数据说明与导入导出入口 ›", 13.5f, Tokens.pri, Tokens.weightM())
+        link.setOnClickListener { nav("io") }
+        body.addView(link, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(12f) })
         Sheets.sheet(act, "数据说明", body, null)
     }
 }
