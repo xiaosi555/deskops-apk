@@ -731,7 +731,7 @@ private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Co
 @Composable
 private fun StudyCalendarCard(sessions: List<StudySession>, courses: List<Course>, surface: Color, fg: Color, sub: Color, primary: Color) {
     val dateFormat = remember { java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
-    val monthCalendar = java.util.Calendar.getInstance().apply { set(java.util.Calendar.DAY_OF_MONTH, 1) }
+    val monthCalendar = java.util.Calendar.getInstance().apply { firstDayOfWeek = java.util.Calendar.SUNDAY; set(java.util.Calendar.DAY_OF_MONTH, 1) }
     val monthPrefix = java.text.SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(monthCalendar.time)
     val monthTitle = java.text.SimpleDateFormat("yyyy年M月", Locale.getDefault()).format(monthCalendar.time)
     val firstOffset = (monthCalendar.get(java.util.Calendar.DAY_OF_WEEK) - monthCalendar.firstDayOfWeek + 7) % 7
