@@ -7,6 +7,8 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.core.widget.NestedScrollView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.qwen.opsmentor.App
 import com.qwen.opsmentor.core.AnnotatedText
 import com.qwen.opsmentor.core.MarkEditor
@@ -64,11 +66,15 @@ abstract class Page(val act: Activity, val app: App) {
         val c = act
         val box = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            // HTML 最终版两种风格的 stage 均为 20px；窄屏媒体查询收窄为 17px。
+            // HTML 最终版两种风格均为 20px，窄屏收窄为 17px；左右再叠加刘海/挖孔安全区。
             val widthDp = c.resources.displayMetrics.widthPixels / c.resources.displayMetrics.density
-            val pad = c.dp(if (widthDp <= 420f) 17f else 20f)
+            val basePad = c.dp(if (widthDp <= 420f) 17f else 20f)
+            val safe = ViewCompat.getRootWindowInsets(c.window.decorView)
+                ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            val leftPad = maxOf(basePad, safe?.left ?: 0)
+            val rightPad = maxOf(basePad, safe?.right ?: 0)
             // HTML stage 底部预留 122px；原生容器已避开 60px 底栏，因此内容补足 62px。
-            setPadding(pad, 0, pad, c.dp(62f))
+            setPadding(leftPad, 0, rightPad, c.dp(62f))
         }
         val owner = (c as? ScrollOwner)
         val sv = object : NestedScrollView(c) {
@@ -86,6 +92,17 @@ abstract class Page(val act: Activity, val app: App) {
         scroll = sv
         content = box
         return sv
+    }
+
+    /** Insets 更新时重新计算左右安全留白，兼容横屏挖孔与窗口尺寸变化。 */
+    fun updateContentInsets() {
+        val box = content ?: return
+        val widthDp = act.resources.displayMetrics.widthPixels / act.resources.displayMetrics.density
+        val basePad = act.dp(if (widthDp <= 420f) 17f else 20f)
+        val safe = ViewCompat.getRootWindowInsets(act.window.decorView)
+            ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+        box.setPadding(maxOf(basePad, safe?.left ?: 0), box.paddingTop,
+            maxOf(basePad, safe?.right ?: 0), act.dp(62f))
     }
 
     /** 整页重绘；keepScroll=false 时回顶部（对应 Web 的 __readTop） */
