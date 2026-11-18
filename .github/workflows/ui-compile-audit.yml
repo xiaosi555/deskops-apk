@@ -2,7 +2,7 @@ name: UI design parity compile audit
 
 on:
   push:
-    branches: [ui/html-design-parity]
+    branches: [ui/html-design-parity, fix/html-parity-full-rebuild]
   workflow_dispatch:
 
 concurrency:
