@@ -65,13 +65,27 @@ class MainActivity : ComponentActivity() {
         window.statusBarColor = android.graphics.Color.rgb(247, 248, 252)
         window.navigationBarColor = android.graphics.Color.rgb(247, 248, 252)
         window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-        setContent { DeskOpsApp(::speakText) }
+        setContent { DeskOpsApp(::speakText, ::availableTtsVoices) }
         Log.i("DeskOpsNativeSmoke", "NATIVE_APP_READY")
     }
 
     private fun speakText(text: String) {
-        if (ttsReady) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "deskops-reading")
-        else Toast.makeText(this, "系统语音引擎尚未就绪", Toast.LENGTH_SHORT).show()
+        if (!ttsReady) {
+            Toast.makeText(this, "系统语音引擎尚未就绪，请检查手机是否安装并启用 TTS 服务", Toast.LENGTH_LONG).show()
+            return
+        }
+        val prefs = getSharedPreferences("deskops_native", 0)
+        tts?.setSpeechRate(prefs.getFloat("tts_rate", 1.0f).coerceIn(0.5f, 2.0f))
+        tts?.setPitch(prefs.getFloat("tts_pitch", 1.0f).coerceIn(0.5f, 2.0f))
+        val voiceName = prefs.getString("tts_voice", "") ?: ""
+        if (voiceName.isNotBlank()) tts?.voices?.firstOrNull { it.name == voiceName }?.let { tts?.voice = it }
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "deskops-reading")
+    }
+
+    private fun availableTtsVoices(): List<Pair<String, String>> {
+        return tts?.voices?.sortedBy { it.locale.displayName }?.map { voice ->
+            voice.name to (voice.locale.displayName + " · " + voice.name)
+        } ?: emptyList()
     }
 
     override fun onDestroy() {
@@ -84,7 +98,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DeskOpsApp(speak: (String) -> Unit) {
+private fun DeskOpsApp(speak: (String) -> Unit, getTtsVoices: () -> List<Pair<String, String>>) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("deskops_native", 0) }
     val media = remember { mutableStateListOf<DeskMedia>().apply { addAll(readMedia(prefs.getString("media", "[]") ?: "[]")) } }
@@ -105,6 +119,9 @@ private fun DeskOpsApp(speak: (String) -> Unit) {
     var courseIntro by remember { mutableStateOf("") }
     var themeChoice by remember { mutableIntStateOf(prefs.getInt("theme", 0)) }
     var darkMode by remember { mutableStateOf(prefs.getBoolean("dark", false)) }
+    var ttsRate by remember { mutableFloatStateOf(prefs.getFloat("tts_rate", 1.0f)) }
+    var ttsPitch by remember { mutableFloatStateOf(prefs.getFloat("tts_pitch", 1.0f)) }
+    var ttsVoice by remember { mutableStateOf(prefs.getString("tts_voice", "") ?: "") }
     val palettes = listOf(Color(0xFF6757D9), Color(0xFF2878D0), Color(0xFF168C76), Color(0xFFE18A35))
     val primary = palettes[themeChoice.coerceIn(0, 3)]
     val bg = if (darkMode) Color(0xFF11131A) else Color(0xFFF6F7FB)
@@ -234,7 +251,11 @@ private fun DeskOpsApp(speak: (String) -> Unit) {
                         onTheme = { themeChoice = it; prefs.edit().putInt("theme", it).apply() },
                         onDark = { darkMode = it; prefs.edit().putBoolean("dark", it).apply() },
                         onExport = { exportBackupLauncher.launch("deskops-learning-backup.json") },
-                        onImport = { importBackupLauncher.launch(arrayOf("application/json", "text/*")) })
+                        onImport = { importBackupLauncher.launch(arrayOf("application/json", "text/*")) },
+                        ttsRate = ttsRate, ttsPitch = ttsPitch, ttsVoice = ttsVoice, getTtsVoices = getTtsVoices,
+                        onTtsRate = { ttsRate = it; prefs.edit().putFloat("tts_rate", it).apply() },
+                        onTtsPitch = { ttsPitch = it; prefs.edit().putFloat("tts_pitch", it).apply() },
+                        onTtsVoice = { ttsVoice = it; prefs.edit().putString("tts_voice", it).apply() })
                 }
             }
         }
@@ -470,7 +491,8 @@ private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: C
 }
 
 @Composable
-private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, onTheme: (Int) -> Unit, onDark: (Boolean) -> Unit, onExport: () -> Unit, onImport: () -> Unit) {
+@OptIn(ExperimentalMaterial3Api::class)
+private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, onTheme: (Int) -> Unit, onDark: (Boolean) -> Unit, onExport: () -> Unit, onImport: () -> Unit, ttsRate: Float, ttsPitch: Float, ttsVoice: String, getTtsVoices: () -> List<Pair<String, String>>, onTtsRate: (Float) -> Unit, onTtsPitch: (Float) -> Unit, onTtsVoice: (String) -> Unit) {
     val colors = listOf(Color(0xFF6757D9), Color(0xFF2878D0), Color(0xFF168C76), Color(0xFFE18A35))
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Text("个性化", color = fg, fontSize = 23.sp, fontWeight = FontWeight.Bold) }
@@ -487,6 +509,33 @@ private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Co
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) { Text("深色模式", color = fg, fontWeight = FontWeight.SemiBold); Text("根据环境切换阅读外观", color = sub, fontSize = 12.sp) }
                 Switch(checked = dark, onCheckedChange = onDark)
+            }
+        }
+        item {
+            var voiceExpanded by remember { mutableStateOf(false) }
+            var voices by remember { mutableStateOf(getTtsVoices()) }
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(surface).padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("朗读设置", color = fg, fontWeight = FontWeight.SemiBold)
+                Text("语速  " + String.format(Locale.getDefault(), "%.1f×", ttsRate), color = sub, fontSize = 12.sp)
+                Slider(value = ttsRate, onValueChange = onTtsRate, valueRange = 0.5f..2.0f)
+                Text("音调  " + String.format(Locale.getDefault(), "%.1f", ttsPitch), color = sub, fontSize = 12.sp)
+                Slider(value = ttsPitch, onValueChange = onTtsPitch, valueRange = 0.5f..2.0f)
+                ExposedDropdownMenuBox(expanded = voiceExpanded, onExpandedChange = { voiceExpanded = !voiceExpanded }) {
+                    OutlinedTextField(
+                        value = voices.firstOrNull { it.first == ttsVoice }?.second ?: if (ttsVoice.isBlank()) "系统默认音色" else ttsVoice,
+                        onValueChange = {}, readOnly = true, label = { Text("系统语音音色") },
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(voiceExpanded) }
+                    )
+                    ExposedDropdownMenu(expanded = voiceExpanded, onDismissRequest = { voiceExpanded = false }) {
+                        DropdownMenuItem(text = { Text("系统默认音色") }, onClick = { onTtsVoice(""); voiceExpanded = false })
+                        voices.forEach { voice -> DropdownMenuItem(text = { Text(voice.second, maxLines = 2) }, onClick = { onTtsVoice(voice.first); voiceExpanded = false }) }
+                    }
+                }
+                OutlinedButton(onClick = { voices = getTtsVoices() }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Rounded.Refresh, null); Spacer(Modifier.width(6.dp)); Text("重新读取手机已安装音色")
+                }
+                if (voices.isEmpty()) Text("暂未读取到音色。请先在手机系统设置中安装或启用语音服务，再点击刷新。", color = sub, fontSize = 12.sp)
             }
         }
         item {
