@@ -177,6 +177,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
             topPad = 0
             appbar.setPadding(0, 0, 0, 0)
         }
+        deco.update(decoKey(), dp(150f) + topPad)
         layoutStage()
         render()
     }
@@ -218,8 +219,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         root = FrameLayout(this)
-        deco = DecoView(this, decoKey(), dp(240f))
-        root.addView(deco, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(240f)))
+        deco = DecoView(this, decoKey(), dp(150f))
+        root.addView(deco, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(150f)))
         stage = FrameLayout(this)
         root.addView(stage, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
@@ -256,11 +257,18 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         })
 
         setContentView(root)
+        root.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+                syncContentWidths()
+                layoutStage()
+            }
+        }
         installSystemBackHandler()
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             topPad = if (app.store.topInset) bars.top else 0
             bottomPad = bars.bottom
+            deco.update(decoKey(), dp(150f) + topPad)
             pages.values.forEach { it.updateContentInsets() }
             appbar.setPadding(0, topPad, 0, 0)
             tabbar.setPadding(0, 0, 0, bottomPad)
@@ -446,7 +454,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
             isAppearanceLightStatusBars = !Tokens.dark
             isAppearanceLightNavigationBars = !Tokens.dark
         }
-        deco.update(decoKey(), dp(240f))
+        deco.update(decoKey(), dp(150f) + topPad)
 
         val onTab = tabs.containsKey(view)
         val page = pages.getOrPut(view) { make(view) }
