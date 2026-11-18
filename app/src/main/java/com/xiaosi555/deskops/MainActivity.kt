@@ -42,8 +42,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 
-private data class DeskMedia(val uri: String, val name: String, val mime: String, val folder: String = "")
-private data class Course(val id: Long, val title: String, val intro: String, val chapters: Int = 0, val progress: Int = 0)
+private data class DeskMedia(val uri: String, val name: String, val mime: String, val folder: String = "", val addedAt: Long = System.currentTimeMillis())
+private data class Course(
+    val id: Long,
+    val title: String,
+    val intro: String,
+    val chapters: Int = 0,
+    val progress: Int = 0,
+    val chapterItems: List<Chapter> = emptyList()
+)
 
 class MainActivity : ComponentActivity() {
     private var tts: TextToSpeech? = null
@@ -361,7 +368,36 @@ private fun EmptyCard(title: String, detail: String, surface: Color, sub: Color)
 private fun queryDisplayName(context: android.content.Context, uri: Uri): String? {
     return try { context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null } } catch (_: Exception) { null }
 }
-private fun writeMedia(list: List<DeskMedia>): String = JSONArray().apply { list.forEach { put(JSONObject().put("uri", it.uri).put("name", it.name).put("mime", it.mime).put("folder", it.folder)) } }.toString()
-private fun readMedia(raw: String): List<DeskMedia> = try { val a = JSONArray(raw); (0 until a.length()).map { val o = a.getJSONObject(it); DeskMedia(o.optString("uri"), o.optString("name"), o.optString("mime"), o.optString("folder")) } } catch (_: Exception) { emptyList() }
-private fun writeCourses(list: List<Course>): String = JSONArray().apply { list.forEach { put(JSONObject().put("id", it.id).put("title", it.title).put("intro", it.intro).put("chapters", it.chapters).put("progress", it.progress)) } }.toString()
-private fun readCourses(raw: String): List<Course> = try { val a = JSONArray(raw); (0 until a.length()).map { val o = a.getJSONObject(it); Course(o.optLong("id"), o.optString("title"), o.optString("intro"), o.optInt("chapters"), o.optInt("progress")) } } catch (_: Exception) { emptyList() }
+private fun writeMedia(list: List<DeskMedia>): String = JSONArray().apply {
+    list.forEach { put(JSONObject().put("uri", it.uri).put("name", it.name).put("mime", it.mime).put("folder", it.folder).put("addedAt", it.addedAt)) }
+}.toString()
+private fun readMedia(raw: String): List<DeskMedia> = try {
+    val a = JSONArray(raw)
+    (0 until a.length()).map { val o = a.getJSONObject(it); DeskMedia(o.optString("uri"), o.optString("name"), o.optString("mime"), o.optString("folder"), o.optLong("addedAt", System.currentTimeMillis())) }
+} catch (_: Exception) { emptyList() }
+private fun writeCourses(list: List<Course>): String = JSONArray().apply {
+    list.forEach { course ->
+        val chapters = JSONArray().apply {
+            course.chapterItems.forEach { chapter ->
+                put(JSONObject().put("id", chapter.id).put("title", chapter.title).put("content", chapter.content)
+                    .put("mediaUri", chapter.mediaUri).put("completed", chapter.completed).put("lastPositionMs", chapter.lastPositionMs))
+            }
+        }
+        put(JSONObject().put("id", course.id).put("title", course.title).put("intro", course.intro)
+            .put("chapters", course.chapterItems.size.coerceAtLeast(course.chapters)).put("progress", course.progress).put("chapterItems", chapters))
+    }
+}.toString()
+private fun readCourses(raw: String): List<Course> = try {
+    val a = JSONArray(raw)
+    (0 until a.length()).map { index ->
+        val o = a.getJSONObject(index)
+        val chapterArray = o.optJSONArray("chapterItems") ?: JSONArray()
+        val chapterItems = (0 until chapterArray.length()).map { ci ->
+            val ch = chapterArray.getJSONObject(ci)
+            Chapter(ch.optLong("id"), ch.optString("title"), ch.optString("content"), ch.optString("mediaUri"),
+                ch.optBoolean("completed"), ch.optLong("lastPositionMs"))
+        }
+        Course(o.optLong("id"), o.optString("title"), o.optString("intro"), chapterItems.size.coerceAtLeast(o.optInt("chapters")),
+            o.optInt("progress"), chapterItems)
+    }
+} catch (_: Exception) { emptyList() }
