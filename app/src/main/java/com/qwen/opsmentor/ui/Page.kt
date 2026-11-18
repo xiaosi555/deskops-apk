@@ -93,8 +93,8 @@ abstract class Page(val act: Activity, val app: App) {
         body(box)
         // HTML .stagger：页面进入时，一级内容按 30ms 起步错峰浮现。
         if (animateItems && !Tokens.reducedMotion) {
-            box.children.forEachIndexed { index, child ->
-                child.itemIn((30L + index * 50L).coerceAtMost(390L))
+            for (index in 0 until box.childCount) {
+                box.getChildAt(index).itemIn((30L + index * 50L).coerceAtMost(390L))
             }
         }
         app.registerBlocks(blocks)
