@@ -209,3 +209,149 @@ for p in src.rglob("*.kt"):
         out.append(line)
     p.write_text("\n".join(out) + "\n", encoding="utf-8")
 print("Repair pass complete.")
+
+
+# Second-pass fixes from the compile-only diagnostics.
+rep("core/Dsl.kt", [
+    ("lp.setMargins((l * d).toInt(), (t * d).toInt(), (r * d).toInt(), (b * d).toInt())",
+     "if (lp is ViewGroup.MarginLayoutParams) lp.setMargins((l * d).toInt(), (t * d).toInt(), (r * d).toInt(), (b * d).toInt())")
+])
+def dsl2(s):
+    if "fun View.flat(color: Int, radiusPx: Int)" not in s:
+        s += '''
+fun View.flat(color: Int, radiusPx: Int) = flat(color, radiusPx.toFloat())
+fun View.surface(color: Int, radiusPx: Int, elevationDp: Float = 0f, stroke: Boolean = false) =
+    surface(color, radiusPx.toFloat(), elevationDp, stroke)
+'''
+    return s
+edit("core/Dsl.kt", dsl2)
+
+rep("core/Selection.kt", [
+    ("import com.qwen.opsmentor.core.Tokens", "import com.qwen.opsmentor.core.Tokens\nimport com.qwen.opsmentor.core.animatePop"),
+    ("root.width - w - app.dp(6f)", "root.width.toFloat() - w - app.dp(6f).toFloat()"),
+    ("root.height - h - app.dp(84f)", "root.height.toFloat() - h - app.dp(84f).toFloat()"),
+    ("root.width - bar.width - app.dp(6f)", "root.width.toFloat() - bar.width.toFloat() - app.dp(6f).toFloat()"),
+    ("root.height - bar.height - app.dp(84f)", "root.height.toFloat() - bar.height.toFloat() - app.dp(84f).toFloat()")
+])
+rep("core/Sheets.kt", [
+    ("btn(ctx, saveText, \"pri\")", "btn(ctx, saveText ?: \"保存\", \"pri\")")
+])
+rep("media/MediaCourses.kt", [
+    ("if (d > 0) { c.media = m.copy(dur = d / 1000); changed = true }", "if (d > 0) { c.media = m.copy(dur = d / 1000); changed = true }")
+])
+rep("data/Pack.kt", [("val quiz: Quiz, val content: String = \"\", val media: MediaRef? = null,", "val quiz: Quiz, val content: String = \"\", var media: MediaRef? = null,")])
+rep("state/Courses.kt", [("?: pack.title", "?: co.title")])
+
+# Page/editor structure fixes.
+rep("ui/Editor.kt", [
+    ("body.getChildAt(1).getChildAt(1)", "(body.getChildAt(1) as ViewGroup).getChildAt(1)"),
+    ("body.getChildAt(2).getChildAt(1)", "(body.getChildAt(2) as ViewGroup).getChildAt(1)"),
+    ("val v = View(ctx)\n            val p = ctx.dp(66f)", "val v = FrameLayout(ctx)\n            val p = ctx.dp(66f)")
+])
+rep("ui/Page.kt", [
+    ("val box = View(c).apply {", "val box = FrameLayout(c).apply {"),
+    ("(it.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = c.dp(8f)",
+     "it.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { lp -> lp.topMargin = c.dp(8f) }")
+])
+rep("ui/ShortcutsEdit.kt", [
+    ("            ic.gravity = Gravity.CENTER\n", ""),
+    ('Sheets.confirm(ctx, "删除「${it.name.ifBlank { "未命名" }}」？"', 'Sheets.confirm(ctx, "删除「${s.name.ifBlank { "未命名" }}」？"'),
+    ("(list2.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = ctx.dp(10f)",
+     "list2.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(10f) }")
+])
+rep("ui/pages/MarksPages.kt", [
+    ("(wrap.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = ctx.dp(10f)",
+     "wrap.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(10f) }")
+])
+rep("ui/pages/PageMine.kt", [
+    ("(box.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = ctx.dp(10f)",
+     "box.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(10f) }")
+])
+rep("ui/pages/ToolPages.kt", [
+    ("(row.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)).topMargin = ctx.dp(12f)",
+     "row.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(12f) }")
+])
+
+# Correct imports and small call-site errors.
+def add_imports(rel, imports):
+    def f(s):
+        lines=s.splitlines()
+        for imp in imports:
+            if imp not in s:
+                lines.insert(1, imp)
+        return "\n".join(lines)+"\n"
+    edit(rel,f)
+add_imports("ui/MainActivity.kt", ["import com.qwen.opsmentor.core.surface"])
+add_imports("ui/pages/PageCourse.kt", ["import com.qwen.opsmentor.core.animatePop"])
+add_imports("ui/pages/PageProfile.kt", ["import com.qwen.opsmentor.core.groupTitle"])
+add_imports("ui/pages/PageToday.kt", ["import com.qwen.opsmentor.core.size", "import com.qwen.opsmentor.core.weight", "import com.qwen.opsmentor.data.lines", "import android.widget.TextView"])
+add_imports("ui/pages/ToolPages.kt", ["import com.qwen.opsmentor.core.size", "import com.qwen.opsmentor.core.weight"])
+add_imports("ui/pages/PagePlayer.kt", ["import com.qwen.opsmentor.data.toJson"])
+
+rep("ui/pages/MePages.kt", [
+    ('items.add("一二三四五六日"[i].toString() + (if (fmt.format(d) == fmt.format(Date())) "·今" else ""), minutesOf(fmt.format(d)))',
+     'items.add("一二三四五六日"[i].toString() + (if (fmt.format(d) == fmt.format(Date())) "·今" else "") to minutesOf(fmt.format(d)))'),
+    ('items.add("${mth + 1}", v)', 'items.add("${mth + 1}" to v)')
+])
+rep("ui/pages/PageCourse.kt", [
+    ("    private fun currentChapterId(): String {\n        val b = app.store.bag()\n        if (b.pin.isNotEmpty() && pack.chById(b.pin) != null) return b.pin\n        val q = pack.route(b.route)\n        return if (q.isEmpty()) \"\" else q[b.idx.coerceIn(0, q.size - 1)]\n    }\n", "")
+])
+rep("ui/Rows.kt", [
+    ("Regex(\"^(\\\\d+)\").match(v)!!.value.length", "Regex(\"^(\\\\d+)\").find(v)!!.value.length")
+])
+rep("ui/pages/PagePlayer.kt", [
+    ("uc?.packJson = pack.toJson().toString()", "uc?.let { it.packJson = pack.toJson().toString() }")
+])
+
+# MainActivity callbacks and lifecycle signatures.
+def main2(s):
+    s=s.replace("CourseEditor.open(currentCourse())", "CourseEditor.open(this, app, currentCourse())")
+    s=s.replace("app.timer.onResume(view)", "app.timer.onResume()")
+    s=s.replace("app.systemDark = newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES",
+                "app.updateSystemDark(newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES)")
+    # Make reader non-null after the visibility guard.
+    s=s.replace("val r = app.reader\n        val show = r != null && view == \"today\"",
+                "val reader = app.reader\n        val show = reader != null && view == \"today\"")
+    s=s.replace("        if (readerPill == null) {\n", "        val r = reader ?: return\n        if (readerPill == null) {\n", 1)
+    return s
+edit("ui/MainActivity.kt", main2)
+
+# App exposes one controlled configuration update instead of a private-setter write from Activity.
+def appfix(s):
+    if "fun updateSystemDark" not in s:
+        s=s.replace("    fun refreshTheme() {", "    fun updateSystemDark(value: Boolean) { systemDark = value; refreshTheme() }\n\n    fun refreshTheme() {")
+    return s
+edit("App.kt", appfix)
+
+# Fix page component types and callback captures.
+rep("ui/pages/PageProfile.kt", [
+    ("val c = View(ctx)", "val c = FrameLayout(ctx)")
+])
+def today(s):
+    s=s.replace("ctx.dp(if (j == 0) 0 else 3f)", "ctx.dp(if (j == 0) 0f else 3f)")
+    s=s.replace('row.addView(btn(ctx, "看参考答案", "n", small = true).also {\n                it.setOnClickListener {\n                    if (ans.visibility == View.GONE) {\n                        ans.visibility = View.VISIBLE; ans.maxLines = 0; it.text = "收起答案"\n                    } else { ans.visibility = View.GONE; it.text = "看参考答案" }\n                }\n            })',
+'''val toggle = btn(ctx, "看参考答案", "n", small = true)
+            toggle.setOnClickListener {
+                if (ans.visibility == View.GONE) {
+                    ans.visibility = View.VISIBLE; ans.maxLines = 0; toggle.text = "收起答案"
+                } else { ans.visibility = View.GONE; toggle.text = "看参考答案" }
+            }
+            row.addView(toggle)''')
+    s=s.replace("private fun View.circleS(ctx: Activity, color: Int, rDp: Float)", "private fun TextView.circleS(ctx: Activity, color: Int, rDp: Float)")
+    s=s.replace("flat(if (Tokens.planet) Tokens.pri else Tokens.priSoft, ctx.dp(rDp))", "flat(if (Tokens.planet) color else Tokens.priSoft, ctx.dp(rDp).toFloat())")
+    return s
+edit("ui/pages/PageToday.kt", today)
+
+# Rows and utility call fixes.
+rep("ui/Rows.kt", [("ctx.dp(Tokens.rInner()))", "ctx.dp(Tokens.rInner()).toFloat()")])
+# MainActivity: use non-null reader for callbacks and remove accidental stale nullable accesses.
+def readerfix(s):
+    s=s.replace("r.toggle(); updateReaderPill()", "reader.toggle(); updateReaderPill()")
+    s=s.replace("r.stop(); updateReaderPill()", "reader.stop(); updateReaderPill()")
+    s=s.replace("r.setRate(v.toFloatOrNull() ?: 1f)", "reader.setRate(v.toFloatOrNull() ?: 1f)")
+    s=s.replace("if (r.on)", "if (reader.on)")
+    s=s.replace("if (r.segsSize() > 0)", "if (reader.segsSize() > 0)")
+    return s
+edit("ui/MainActivity.kt", readerfix)
+
+print("Second-pass repair complete.")
