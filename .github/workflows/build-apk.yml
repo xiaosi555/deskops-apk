@@ -1,4 +1,4 @@
-name: Build Native Android APK
+name: Build Android APK
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deskops-native-apk-${{ github.ref }}
+  group: deskops-webview-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -42,7 +42,7 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build native debug APK
+      - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
       - name: Verify APK output
@@ -53,12 +53,12 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: deskops-native-debug-apk
+          name: deskops-webview-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Native Android emulator smoke test
+      - name: Android emulator startup smoke test
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -70,7 +70,19 @@ jobs:
             adb logcat -c
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -W -n com.xiaosi555.deskops/.MainActivity
-            sleep 8
-            adb logcat -d -b crash
-            adb shell pidof com.xiaosi555.deskops
-            adb shell dumpsys activity activities | grep -F "com.xiaosi555.deskops"
+            for i in $(seq 1 30); do
+              if adb logcat -d -s DeskOpsSmoke:I | grep -q "APP_PAGE_READY"; then break; fi
+              sleep 2
+            done
+            LOG="$(adb logcat -d -s DeskOpsSmoke:I)"
+            echo "$LOG"
+            echo "$LOG" | grep -q "APP_PAGE_READY"
+            echo "$LOG" | grep -q '"bridge":true'
+            echo "$LOG" | grep -q '"mediaPicker":true'
+            echo "$LOG" | grep -q '"mediaImport":true'
+            echo "$LOG" | grep -q '"tts":true'
+            echo "$LOG" | grep -q '"back":true'
+            if adb logcat -d -s AndroidRuntime:E | grep -q "FATAL EXCEPTION"; then
+              echo "Android runtime crash detected"
+              exit 1
+            fi
