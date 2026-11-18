@@ -185,14 +185,29 @@ object MediaCourses {
         pack.ch.forEach { c ->
             val m = c.media ?: return@forEach
             val dst = File(dir(ctx, courseId), c.id + "." + ext(m.fname))
-            if (dst.exists()) { done++; return@forEach }
+            if (dst.isFile && dst.length() > 0L && (m.size <= 0L || dst.length() == m.size)) {
+                done++
+                return@forEach
+            }
+            // 使用同目录临时文件，避免应用中断后留下一个被误判为完整的半截媒体文件。
+            dst.delete()
+            val temp = File(dst.parentFile, dst.name + ".part")
+            temp.delete()
             val copied = runCatching {
                 val input = ctx.contentResolver.openInputStream(Uri.parse(m.uri))
                     ?: throw IllegalStateException("无法打开媒体文件")
-                input.use { ins -> dst.outputStream().use { out -> ins.copyTo(out) } }
-                dst.exists()
+                input.use { ins -> temp.outputStream().use { out -> ins.copyTo(out) } }
+                if (!temp.isFile || temp.length() <= 0L) throw IllegalStateException("媒体文件为空")
+                if (!temp.renameTo(dst)) {
+                    temp.copyTo(dst, overwrite = true)
+                    temp.delete()
+                }
+                dst.isFile && dst.length() > 0L
             }.getOrDefault(false)
-            if (copied) done++ else dst.delete()
+            if (copied) done++ else {
+                temp.delete()
+                dst.delete()
+            }
         }
         return done
     }
