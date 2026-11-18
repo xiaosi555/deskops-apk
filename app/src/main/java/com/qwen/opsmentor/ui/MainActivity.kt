@@ -271,7 +271,11 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     private fun currentCourse() = Courses.find(app.store, app.store.cur)
 
     /** HTML .app / .stage 的 640px 最大内容宽度，手机全宽、平板居中。 */
-    private fun contentWidth(): Int = minOf(resources.displayMetrics.widthPixels, dp(640f))
+    private fun contentWidth(): Int {
+        // 优先使用当前 Activity 窗口的实测宽度，避免分屏/自由窗口仍按整块屏幕计算。
+        val available = root.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        return minOf(available, dp(640f))
+    }
 
     /** 旋转屏幕 / 窗口尺寸变化后，保持 HTML 640px 应用画布居中。 */
     private fun syncContentWidths() {
