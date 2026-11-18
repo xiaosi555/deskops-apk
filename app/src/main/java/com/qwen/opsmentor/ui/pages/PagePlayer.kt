@@ -63,6 +63,12 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     }
 
     override fun body(host: LinearLayout) {
+        // Page.rerender 会重建整棵视图树；先释放旧 VideoView / MediaPlayer，再创建新控件。
+        stopPlayer()
+        video = null
+        seek = null
+        timeLabel = null
+        playBtn = null
         val ctx = act
         val co = Courses.find(store, store.cur)
         if (co.media.isEmpty()) {
@@ -332,10 +338,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
 
     private fun stopPlayer() {
         runCatching { video?.stopPlayback() }
-        runCatching {
-            player?.stop()
-            player?.release()
-        }
+        runCatching { player?.stop() }
+        runCatching { player?.release() }
         player = null
         preparedVideoPlayer = null
         paused = true
