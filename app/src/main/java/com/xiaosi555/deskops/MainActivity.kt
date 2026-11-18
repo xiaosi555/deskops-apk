@@ -89,6 +89,8 @@ private fun DeskOpsApp(speak: (String) -> Unit) {
     val prefs = remember { context.getSharedPreferences("deskops_native", 0) }
     val media = remember { mutableStateListOf<DeskMedia>().apply { addAll(readMedia(prefs.getString("media", "[]") ?: "[]")) } }
     val courses = remember { mutableStateListOf<Course>().apply { addAll(readCourses(prefs.getString("courses", "[]") ?: "[]")) } }
+    val highlights = remember { mutableStateListOf<Highlight>().apply { addAll(LearningDataCodec.decodeHighlights(prefs.getString("highlights", "[]") ?: "[]")) } }
+    val sessions = remember { mutableStateListOf<StudySession>().apply { addAll(LearningDataCodec.decodeSessions(prefs.getString("sessions", "[]") ?: "[]")) } }
     var tab by remember { mutableStateOf("学习") }
     var page by remember { mutableStateOf("root") }
     var selectedMedia by remember { mutableStateOf<DeskMedia?>(null) }
@@ -110,6 +112,34 @@ private fun DeskOpsApp(speak: (String) -> Unit) {
     val fg = if (darkMode) Color(0xFFF2F3F8) else Color(0xFF202332)
     val sub = if (darkMode) Color(0xFFAAAFBF) else Color(0xFF777D8E)
 
+    val exportBackupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) runCatching {
+            val backup = LearningDataCodec.encodeBackup(writeCourses(courses), writeMedia(media), LearningDataCodec.encodeHighlights(highlights), LearningDataCodec.encodeSessions(sessions))
+            context.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(backup) }
+                ?: error("无法写入所选文件")
+            Toast.makeText(context, "学习数据备份已导出", Toast.LENGTH_LONG).show()
+        }.onFailure { Toast.makeText(context, "导出失败：" + (it.message ?: "未知错误"), Toast.LENGTH_LONG).show() }
+    }
+    val importBackupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runCatching {
+            val raw = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                ?: error("无法读取备份文件")
+            val root = LearningDataCodec.validateBackup(raw)
+            val importedCourses = readCourses(root.getJSONArray("courses").toString())
+            val importedMedia = readMedia(root.optJSONArray("media")?.toString() ?: "[]")
+            val importedHighlights = LearningDataCodec.decodeHighlights(root.optJSONArray("highlights")?.toString() ?: "[]")
+            val importedSessions = LearningDataCodec.decodeSessions(root.optJSONArray("sessions")?.toString() ?: "[]")
+            courses.clear(); courses.addAll(importedCourses)
+            media.clear(); media.addAll(importedMedia)
+            highlights.clear(); highlights.addAll(importedHighlights)
+            sessions.clear(); sessions.addAll(importedSessions)
+            prefs.edit().putString("courses", writeCourses(courses)).putString("media", writeMedia(media))
+                .putString("highlights", LearningDataCodec.encodeHighlights(highlights))
+                .putString("sessions", LearningDataCodec.encodeSessions(sessions)).apply()
+            selectedCourse = null
+            Toast.makeText(context, "已导入课程、媒体、摘录和学习记录", Toast.LENGTH_LONG).show()
+        }.onFailure { Toast.makeText(context, "导入失败：" + (it.message ?: "备份文件无效"), Toast.LENGTH_LONG).show() }
+    }
     val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         uris.forEach { uri ->
             try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
@@ -200,7 +230,11 @@ private fun DeskOpsApp(speak: (String) -> Unit) {
                     "学习" -> LearningHome(courses, media, Modifier.padding(padding), fg, sub, surface, primary) { c -> selectedCourse = c; page = "course" }
                     "课程" -> CourseList(courses, Modifier.padding(padding), fg, sub, surface, primary, onOpen = { selectedCourse = it; page = "course" }, onAdd = { showAddCourse = true })
                     "媒体" -> MediaLibrary(media, Modifier.padding(padding), fg, sub, surface, primary, onPlay = { selectedMedia = it; page = "player" }, onImportFiles = { mediaPicker.launch(arrayOf("video/*", "audio/*")) }, onImportFolder = { folderPicker.launch(null) }, onRemove = { item -> media.remove(item); prefs.edit().putString("media", writeMedia(media)).apply() })
-                    else -> SettingsScreen(themeChoice, darkMode, Modifier.padding(padding), fg, sub, surface, primary, onTheme = { themeChoice = it; prefs.edit().putInt("theme", it).apply() }, onDark = { darkMode = it; prefs.edit().putBoolean("dark", it).apply() })
+                    else -> SettingsScreen(themeChoice, darkMode, Modifier.padding(padding), fg, sub, surface, primary,
+                        onTheme = { themeChoice = it; prefs.edit().putInt("theme", it).apply() },
+                        onDark = { darkMode = it; prefs.edit().putBoolean("dark", it).apply() },
+                        onExport = { exportBackupLauncher.launch("deskops-learning-backup.json") },
+                        onImport = { importBackupLauncher.launch(arrayOf("application/json", "text/*")) })
                 }
             }
         }
@@ -427,7 +461,7 @@ private fun NativePlayer(media: DeskMedia, modifier: Modifier, fg: Color, sub: C
 }
 
 @Composable
-private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, onTheme: (Int) -> Unit, onDark: (Boolean) -> Unit) {
+private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Color, sub: Color, surface: Color, primary: Color, onTheme: (Int) -> Unit, onDark: (Boolean) -> Unit, onExport: () -> Unit, onImport: () -> Unit) {
     val colors = listOf(Color(0xFF6757D9), Color(0xFF2878D0), Color(0xFF168C76), Color(0xFFE18A35))
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Text("个性化", color = fg, fontSize = 23.sp, fontWeight = FontWeight.Bold) }
@@ -444,6 +478,14 @@ private fun SettingsScreen(theme: Int, dark: Boolean, modifier: Modifier, fg: Co
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) { Text("深色模式", color = fg, fontWeight = FontWeight.SemiBold); Text("根据环境切换阅读外观", color = sub, fontSize = 12.sp) }
                 Switch(checked = dark, onCheckedChange = onDark)
+            }
+        }
+        item {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(surface).padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("数据管理", color = fg, fontWeight = FontWeight.SemiBold)
+                Text("完整备份课程章节、媒体索引、学习摘录与学习记录；更换手机前建议先导出备份。", color = sub, fontSize = 12.sp)
+                OutlinedButton(onClick = onExport, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Rounded.FileDownload, null); Spacer(Modifier.width(8.dp)); Text("导出完整学习数据") }
+                OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Rounded.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("导入学习数据备份") }
             }
         }
         item { Text("桌面运维学习 · Android 原生版 2.0", color = sub, fontSize = 12.sp) }
