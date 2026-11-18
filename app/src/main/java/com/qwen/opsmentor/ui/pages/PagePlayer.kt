@@ -122,7 +122,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
             val r = hrow(ctx)
             r.setPadding(0, ctx.dp(10f), 0, ctx.dp(10f))
             r.isClickable = true
-            r.setOnClickListener { PagePlayer.curCh = c.id; start(c, true) }
+            r.setOnClickListener { PagePlayer.curCh = c.id; start(c, true, refreshUi = true) }
             val th = FrameLayout(ctx).apply {
                 flat(Tokens.priSoft, ctx.dp(4f).toFloat())
                 layoutParams = LinearLayout.LayoutParams(ctx.dp(52f), ctx.dp(34f))
@@ -187,7 +187,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         }.getOrDefault(false)
     }
 
-    private fun start(ch: com.qwen.opsmentor.data.Chapter, autoplay: Boolean) {
+    private fun start(ch: com.qwen.opsmentor.data.Chapter, autoplay: Boolean, refreshUi: Boolean = false) {
         val ctx = act
         stopPlayer()
         app.reader?.stop()
@@ -200,22 +200,27 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                 setVideoURI(uri)
                 setOnPreparedListener { mp ->
                     mp.isLooping = false
-                    setRate()
-                    if (autoplay) start()
+                    preparedVideoPlayer = mp
+                    applyRate(mp)
                     restorePos(ch)
-                    ticker?.let { postTick() }
+                    paused = !autoplay
+                    if (autoplay) start()
+                    paintPlay()
+                    postTick()
                 }
                 setOnErrorListener { _, _, _ -> Sheets.toast(ctx, "这个格式在当前设备上播放失败，建议用 mp4"); true }
-                start()
             }
         } else {
             player = MediaPlayer().apply {
                 runCatching {
                     setDataSource(act, uri)
-                    setOnPreparedListener {
-                        setRate()
+                    setOnPreparedListener { mp ->
+                        applyRate(mp)
+                        restorePos(ch)
+                        paused = !autoplay
                         if (autoplay) start()
-                        restorePos(ch); paused = false; paintPlay(); postTick()
+                        paintPlay()
+                        postTick()
                     }
                     setOnErrorListener { _, _, _ -> Sheets.toast(ctx, "这个格式在当前设备上播放失败，建议用 mp3 / m4a"); true }
                     prepareAsync()
@@ -226,7 +231,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
             store.bag().pin = ch.id
             store.save()
         }
-        rerender(false)
+        // body() 首次装配播放器时不能再次触发整页重绘，否则会递归创建播放器。
+        if (refreshUi) rerender(false)
     }
 
     private fun duration(): Int = try {
@@ -265,14 +271,18 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         if (idx < 0) return
         val next = (idx + d).coerceIn(0, pack.ch.size - 1)
         PagePlayer.curCh = pack.ch[next].id
-        start(pack.ch[next], true)
+        start(pack.ch[next], true, refreshUi = true)
+    }
+
+    private var preparedVideoPlayer: MediaPlayer? = null
+
+    private fun applyRate(target: MediaPlayer) {
+        runCatching { target.playbackParams = target.playbackParams.setSpeed(rate) }
     }
 
     private fun setRate() {
-        try {
-            player?.playbackParams = player!!.playbackParams.setSpeed(rate)
-        } catch (e: Exception) {
-        }
+        preparedVideoPlayer?.let { applyRate(it) }
+        player?.let { applyRate(it) }
     }
 
     private fun rateSheet() {
@@ -281,7 +291,6 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         ), rate.toString()) { v, _ ->
             rate = v.toFloatOrNull() ?: 1f
             setRate()
-            rerender(false)
         }
     }
 
@@ -322,7 +331,10 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
             player?.release()
         }
         player = null
+        preparedVideoPlayer = null
+        paused = true
         ticker?.let { handler.removeCallbacks(it) }
+        ticker = null
     }
 
     /** 供外部查询：页面是否正在播放 */
