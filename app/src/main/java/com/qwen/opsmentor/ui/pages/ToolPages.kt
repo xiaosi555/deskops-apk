@@ -227,7 +227,7 @@ class PageReview(act: Activity, app: App) : Page(act, app) {
 class PageCases(act: Activity, app: App) : Page(act, app) {
 
     override val key = "case"
-    override val learning = false
+    override val learning = true
     override fun title() = "案例库"
 
     private var kw = ""
@@ -359,7 +359,7 @@ class PageCases(act: Activity, app: App) : Page(act, app) {
 class PageGloss(act: Activity, app: App) : Page(act, app) {
 
     override val key = "gloss"
-    override val learning = false
+    override val learning = true
     override fun title() = "术语手册"
     private var kw = ""
 
