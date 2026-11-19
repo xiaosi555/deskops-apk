@@ -311,6 +311,7 @@ object Exporter {
         u.put("appearance", store.appearance.name.lowercase())
         u.put("deco", store.deco)
         u.put("profile", JSONObject().put("name", store.profileName).put("bio", store.profileBio).put("avatar", ""))
+        u.put("currentCourse", store.cur)
         u.put("shortcuts", JSONArray(store.shortcuts.map { it.toJson() }))
         u.put("star", JSONObject(store.star as Map<*, *>))
         u.put("cmTab", store.cmTab)
