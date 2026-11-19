@@ -262,7 +262,6 @@ object Importer {
         u.optJSONObject("profile")?.let { p ->
             store.profileName = p.optString("name", store.profileName)
             store.profileBio = p.optString("bio", store.profileBio)
-            if (p.has("avatar")) store.profileAvatar = p.optString("avatar")
         }
         u.optString("currentCourse").takeIf { id -> id.isNotEmpty() && Courses.all(store).any { it.id == id } }?.let { store.setCur(it) }
         u.optJSONObject("star")?.let { s -> s.keys().forEach { k -> store.star[k] = s.optInt(k, 1) } }
