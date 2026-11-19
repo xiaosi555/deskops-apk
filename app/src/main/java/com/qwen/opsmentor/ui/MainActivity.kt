@@ -38,6 +38,7 @@ import com.qwen.opsmentor.core.iconBtn
 import com.qwen.opsmentor.core.label
 import com.qwen.opsmentor.state.Bus
 import com.qwen.opsmentor.state.Courses
+import com.qwen.opsmentor.navigation.AppRoute
 import com.qwen.opsmentor.ui.pages.*
 
 import com.qwen.opsmentor.core.add
@@ -73,8 +74,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     private var bottomPad = 0
 
     /** Tab 页（进入时清空返回栈、不显示顶栏） */
-    val tabs = linkedMapOf("mine" to "课程", "profile" to "我的")
-    private val profileSubs = setOf("calendar", "my-marks", "course-manage", "settings", "shortcuts", "player", "io", "personal-data", "course-import")
+    val tabs = AppRoute.tabKeys
+    private val profileSubs = AppRoute.profileSubKeys
 
     private val titles = mapOf(
         "know" to "知识详解", "anno" to "我的划线", "io" to "数据", "review" to "复习队列",
@@ -444,28 +445,27 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
 
     // ---------------- 渲染 ----------------
 
-    private fun make(key: String): Page = when (key) {
-        "mine" -> PageMine(this, app)
-        "profile" -> PageProfile(this, app)
-        "course" -> PageCourse(this, app)
-        "today" -> PageToday(this, app)
-        "know" -> PageKnow(this, app)
-        "anno" -> PageMarksCourse(this, app)
-        "my-marks" -> PageMarks(this, app)
-        "io" -> PageIo(this, app)
-        "review" -> PageReview(this, app)
-        "case" -> PageCases(this, app)
-        "gloss" -> PageGloss(this, app)
-        "play" -> PagePlaybook(this, app)
-        "prog" -> PageProgress(this, app)
-        "calendar" -> PageCalendar(this, app)
-        "course-manage" -> PageCourseManage(this, app)
-        "course-import" -> PageCourseImport(this, app)
-        "settings" -> PageSettings(this, app)
-        "shortcuts" -> PageShortcuts(this, app)
-        "personal-data" -> PagePersonalData(this, app)
-        "player" -> PagePlayer(this, app)
-        else -> PageMine(this, app)
+    private fun make(key: String): Page = when (AppRoute.fromLegacyKey(key)) {
+        AppRoute.COURSES -> PageMine(this, app)
+        AppRoute.PROFILE -> PageProfile(this, app)
+        AppRoute.COURSE -> PageCourse(this, app)
+        AppRoute.TODAY -> PageToday(this, app)
+        AppRoute.KNOW -> PageKnow(this, app)
+        AppRoute.MARKS_COURSE -> PageMarksCourse(this, app)
+        AppRoute.MY_MARKS -> PageMarks(this, app)
+        AppRoute.DATA -> PageIo(this, app)
+        AppRoute.REVIEW -> PageReview(this, app)
+        AppRoute.CASES -> PageCases(this, app)
+        AppRoute.GLOSSARY -> PageGloss(this, app)
+        AppRoute.PLAYBOOK -> PagePlaybook(this, app)
+        AppRoute.PROGRESS -> PageProgress(this, app)
+        AppRoute.CALENDAR -> PageCalendar(this, app)
+        AppRoute.COURSE_MANAGE -> PageCourseManage(this, app)
+        AppRoute.COURSE_IMPORT -> PageCourseImport(this, app)
+        AppRoute.SETTINGS -> PageSettings(this, app)
+        AppRoute.SHORTCUTS -> PageShortcuts(this, app)
+        AppRoute.PERSONAL_DATA -> PagePersonalData(this, app)
+        AppRoute.PLAYER -> PagePlayer(this, app)
     }
 
     fun render() {
