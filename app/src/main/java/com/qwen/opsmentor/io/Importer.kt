@@ -115,7 +115,7 @@ object Importer {
         val scope = o.optString("scope", "all")
         if (mode == "replace" && scope == "all") {
             // 完整档案覆盖 = 替换整套课程集合与学习状态，而不只是覆盖同 ID 的课程。
-            val oldCourseIds = store.userCourses.map { it.id }
+            val oldCourseIds = (store.userCourses.map { it.id } + store.mediaTrees.keys).distinct()
             val oldTreeUris = store.mediaTrees.values.toList()
             MediaCourses.clearLocalCopies(ctx, oldCourseIds, oldTreeUris)
             store.userCourses.forEach { packs.evict(it.id) }
@@ -123,16 +123,14 @@ object Importer {
             store.bags.clear()
             store.co.clear()
             store.mediaTrees.clear() // SAF 授权属于当前设备，不可从另一设备的档案恢复
-            val hasPersonal = o.optJSONObject("personal")?.optJSONObject("ui") != null ||
-                o.optJSONObject("ui") != null
-            if (hasPersonal) {
-                store.star.clear()
-                store.deletedCourses.clear()
-                store.readPos.clear()
-                store.studyLog.clear()
-                store.mediaPos.clear()
-                store.shortcuts.clear()
-            }
+            // 无论旧档案是否包含个人设置块，覆盖导入都必须清空旧课程关联状态；
+            // 若档案含 personal/ui，后续 applyUi 会再恢复其中保存的数据。
+            store.star.clear()
+            store.deletedCourses.clear()
+            store.readPos.clear()
+            store.studyLog.clear()
+            store.mediaPos.clear()
+            store.shortcuts.clear()
             store.setCur(courses.optJSONObject(0)?.optString("id").orEmpty().ifBlank { Store.COURSE_OPS })
         }
         for (i in 0 until courses.length()) {
