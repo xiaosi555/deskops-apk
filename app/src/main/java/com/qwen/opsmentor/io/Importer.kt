@@ -140,6 +140,7 @@ object Importer {
             c.optJSONObject("state")?.let { st -> applyState(store, packs, id, st, mode, out) }
         }
         // 个人设置
+        o.optString("theme").takeIf { it.isNotEmpty() }?.let { store.theme = it }
         o.optJSONObject("personal")?.optJSONObject("ui")?.let { applyUi(store, it) }
         o.optJSONObject("ui")?.let { applyUi(store, it) }
         store.save()
@@ -221,6 +222,8 @@ object Importer {
     private fun applyUi(store: Store, u: JSONObject) {
         u.optString("style").takeIf { it.isNotEmpty() }?.let { store.style = if (it == "minimal") com.qwen.opsmentor.state.StyleMode.MINIMAL else com.qwen.opsmentor.state.StyleMode.PLANET }
         if (u.has("accent")) store.accent = u.optInt("accent").coerceIn(0, 8)
+        if (u.has("accentCustom")) store.accentCustom = u.optString("accentCustom")
+        if (u.has("accentPaletteVersion")) store.accentPaletteVersion = u.optInt("accentPaletteVersion", 1)
         when (u.optString("appearance", "")) {
             "light" -> store.appearance = com.qwen.opsmentor.state.Appearance.LIGHT
             "dark" -> store.appearance = com.qwen.opsmentor.state.Appearance.DARK
@@ -239,6 +242,8 @@ object Importer {
         u.optJSONObject("readPos")?.let { a -> a.keys().forEach { k -> store.readPos[k] = a.optInt(k) } }
         u.optJSONObject("mediaPos")?.let { a -> a.keys().forEach { k -> store.mediaPos[k] = a.optLong(k) } }
         if (u.has("mediaKeep")) store.mediaKeep = u.optBoolean("mediaKeep", true)
+        if (u.has("topInset")) store.topInset = u.optBoolean("topInset", true)
+        u.optJSONObject("bar")?.let { bar -> store.barX = bar.optDouble("x", -1.0).toFloat(); store.barY = bar.optDouble("y", -1.0).toFloat() }
         u.optString("ttsVoice").takeIf { it.isNotEmpty() }?.let { store.ttsVoice = it }
         u.optJSONArray("shortcuts")?.let { a ->
             val list = ArrayList<com.qwen.opsmentor.state.Shortcut>()
