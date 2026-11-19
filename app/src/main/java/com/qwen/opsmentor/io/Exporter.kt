@@ -406,6 +406,14 @@ object Exporter {
 
     /** 档案 → CSV */
     fun archiveCsv(o: JSONObject, scope: String): String {
+        // 全量 CSV 使用单行 JSON 信封，确保多课程、各自学习状态和个人设置可无损往返。
+        // 仍是标准 CSV（正确转义逗号、引号与换行），避免把多门课程压成第一门。
+        if (scope == "all") {
+            return csvOf(listOf(
+                listOf("格式", "版本", "完整档案JSON"),
+                listOf("OpsMentorArchive", o.optInt("ver", Store.AR_VER).toString(), o.toString())
+            ))
+        }
         val c = o.optJSONArray("courses")?.optJSONObject(0) ?: return ""
         val rows = ArrayList<List<String>>()
         val st = c.optJSONObject("state")
