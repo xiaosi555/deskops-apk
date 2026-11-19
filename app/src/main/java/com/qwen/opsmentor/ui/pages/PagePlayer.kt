@@ -56,6 +56,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     private var pendingAudioStart = false
     private var videoPrepared = false
     private var pendingVideoStart = false
+    private var playbackCompleted = false
     private var activeChapterId = ""
     private var lastPositionSaveAt = 0L
     private var autoplayOnRender = false
@@ -231,6 +232,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         if (src.isEmpty()) { Sheets.toast(ctx, "还没有连接文件"); return }
         activeChapterId = ch.id
         lastPositionSaveAt = android.os.SystemClock.elapsedRealtime()
+        playbackCompleted = false
+        pendingAudioStart = autoplay
         val uri = if (src.startsWith("/")) Uri.fromFile(File(src)) else Uri.parse(src)
         val co = Courses.find(store, store.cur)
         if (co.media == "video") {
@@ -253,6 +256,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                 setOnCompletionListener {
                     pendingVideoStart = false
                     paused = true
+                    playbackCompleted = true
+                    saveCompletedPosition()
                     paintPlay()
                 }
                 setOnErrorListener { _, _, _ ->
@@ -273,7 +278,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                         audioPrepared = true
                         applyRate(mp)
                         restorePos(ch)
-                        val shouldStart = autoplay || pendingAudioStart
+                        val shouldStart = pendingAudioStart
                         pendingAudioStart = false
                         paused = !shouldStart
                         if (shouldStart) runCatching { mp.start() }
@@ -284,6 +289,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                     setOnCompletionListener {
                         paused = true
                         pendingAudioStart = false
+                        playbackCompleted = true
+                        saveCompletedPosition()
                         paintPlay()
                     }
                     setOnErrorListener { mp, _, _ ->
@@ -423,7 +430,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                         }
                     }
                     // 播放结束后保存最终位置并停止轮询，避免完成状态下永久空转。
-                    if (!playing && p >= d) {
+                    if (playbackCompleted || (!playing && p >= d)) {
                         if (chapterId.isNotEmpty()) store.mediaPos["${store.cur}:${chapterId}"] = d.toLong()
                         store.save()
                         ticker = null
@@ -434,6 +441,17 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
             }
         }
         ticker?.let { handler.post(it) }
+    }
+
+    private fun saveCompletedPosition() {
+        val chapterId = activeChapterId
+        val d = duration()
+        if (chapterId.isNotEmpty() && d > 0) {
+            store.mediaPos["${store.cur}:${chapterId}"] = d.toLong()
+            store.save()
+        }
+        ticker?.let { handler.removeCallbacks(it) }
+        ticker = null
     }
 
     private fun fmt(ms: Int): String {
@@ -455,6 +473,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         pendingAudioStart = false
         videoPrepared = false
         pendingVideoStart = false
+        playbackCompleted = false
         preparedVideoPlayer = null
         paused = true
         activeChapterId = ""
