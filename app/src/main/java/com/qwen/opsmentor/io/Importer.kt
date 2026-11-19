@@ -137,7 +137,9 @@ object Importer {
             val isBuiltin = Courses.builtin.any { it.id == id0 } && id0 != ""
             val id = when {
                 isBuiltin && (scope == "all" || scope == "course") -> id0
-                else -> if (mode == "replace" && id0.isNotEmpty()) id0 else pickId(store, id0)
+                mode == "replace" && id0.isNotEmpty() -> id0
+                mode == "merge" && id0.isNotEmpty() && Courses.all(store).any { it.id == id0 } -> id0
+                else -> pickId(store, id0)
             }
             // 课程资料
             if ((scope == "all" || scope == "course") && (c.has("chapters") || c.has("ch") || c.has("handbook"))) {
