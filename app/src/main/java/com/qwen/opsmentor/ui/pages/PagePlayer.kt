@@ -267,6 +267,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                     pendingVideoStart = false
                     playbackError = true
                     paused = true
+                    ticker?.let { handler.removeCallbacks(it) }
+                    ticker = null
                     paintPlay()
                     Sheets.toast(ctx, "这个格式在当前设备上播放失败，建议用 mp4")
                     true
@@ -301,6 +303,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                         pendingAudioStart = false
                         playbackError = true
                         paused = true
+                        ticker?.let { handler.removeCallbacks(it) }
+                        ticker = null
                         runCatching { mp.reset(); mp.release() }
                         if (player === mp) player = null
                         paintPlay()
