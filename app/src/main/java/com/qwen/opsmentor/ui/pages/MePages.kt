@@ -293,12 +293,12 @@ class PagePersonalData(act: Activity, app: App) : Page(act, app) {
         row.setPadding(0, ctx.dp(12f), 0, 0)
         row.addView(btn(ctx, "预览个人数据 JSON", "pri").also {
             it.setOnClickListener {
-                val text = Exporter.personalJson(store)
+                val text = Exporter.personalJson(store, app.packs)
                 Saver.export(ctx, "个人数据 · JSON 存档", "个人数据-${Store.today()}.json", "json", text)
             }
         })
         row.addView(btn(ctx, "导出全量备份", "n").also {
-            it.setOnClickListener { Saver.export(ctx, "全量备份 · JSON", "桌面运维-学习存档-${Store.today()}.json", "json", Exporter.backupJson(store)) }
+            it.setOnClickListener { Saver.export(ctx, "全量备份 · JSON", "桌面运维-学习存档-${Store.today()}.json", "json", Exporter.backupJson(store, app.packs)) }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.marginStart = ctx.dp(8f) })
         c.addView(row)
         c.addView(noteBox(ctx, "提示", "个人数据不含媒体文件本体；导入到另一台设备后，视频 / 语音课程需要重新连接文件。"))
