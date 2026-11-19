@@ -179,7 +179,8 @@ class PageIo(act: Activity, app: App) : Page(act, app) {
     private fun hint(scope: String, fmt: String): String = when (fmt) {
         "json" -> "UTF-8 编码的 ${if (scope == "all") "完整档案" else Exporter.entry(scope)?.name}，字段结构与 Web 版一致，可在另一端「导入档案」原样恢复。"
         "md" -> "可读文档：标题层级与表格排版与学习手册一致，可粘进笔记软件或转 PDF。"
-        else -> "CSV 带 UTF-8 BOM，Excel / WPS 直接打开不乱码；一行一条。"
+        else -> if (scope == "all") "完整档案 CSV：以标准 CSV 封装完整 JSON，保留全部课程、各课程学习状态与个人设置，可再次导入恢复；Excel / WPS 可打开查看。"
+            else "CSV 带 UTF-8 BOM，Excel / WPS 直接打开不乱码；适合逐条查看与整理。"
     }
 
     private fun importPage(host: LinearLayout) {
@@ -191,7 +192,7 @@ class PageIo(act: Activity, app: App) : Page(act, app) {
         })
         hd.addView(pill(ctx, "合并 / 覆盖", true))
         c.addView(hd)
-        c.addView(muted(ctx, "支持本应用导出的完整档案 / 课程资料 / 局部档案（划线、进度、案例）。粘贴 JSON 文本，或从本机选择 .json 文件。"),
+        c.addView(muted(ctx, "支持本应用导出的完整档案与局部档案，格式包括 JSON、Markdown、CSV。可粘贴文本，也可从本机选择对应文件；完整 CSV 会按原档案结构恢复多门课程与个人设置。"),
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) })
         val ta = Sheets.input(ctx, impText, "粘贴存档 JSON，或点下方「选择文件」", 0, true)
         ta.minLines = 6
