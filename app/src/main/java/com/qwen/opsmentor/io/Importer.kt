@@ -110,6 +110,25 @@ object Importer {
         val out = ApplyResult()
         val courses = o.optJSONArray("courses") ?: return out
         val scope = o.optString("scope", "all")
+        if (mode == "replace" && scope == "all") {
+            // 完整档案覆盖 = 替换整套课程集合与学习状态，而不只是覆盖同 ID 的课程。
+            store.userCourses.forEach { packs.evict(it.id) }
+            store.userCourses.clear()
+            store.bags.clear()
+            store.co.clear()
+            store.mediaTrees.clear() // SAF 授权属于当前设备，不可从另一设备的档案恢复
+            val hasPersonal = o.optJSONObject("personal")?.optJSONObject("ui") != null ||
+                o.optJSONObject("ui") != null
+            if (hasPersonal) {
+                store.star.clear()
+                store.deletedCourses.clear()
+                store.readPos.clear()
+                store.studyLog.clear()
+                store.mediaPos.clear()
+                store.shortcuts.clear()
+            }
+            store.setCur(courses.optJSONObject(0)?.optString("id").orEmpty().ifBlank { Store.COURSE_OPS })
+        }
         for (i in 0 until courses.length()) {
             val c = courses.optJSONObject(i) ?: continue
             val title = c.optString("title").trim()
@@ -243,7 +262,9 @@ object Importer {
         u.optJSONObject("profile")?.let { p ->
             store.profileName = p.optString("name", store.profileName)
             store.profileBio = p.optString("bio", store.profileBio)
+            if (p.has("avatar")) store.profileAvatar = p.optString("avatar")
         }
+        u.optString("currentCourse").takeIf { id -> id.isNotEmpty() && Courses.all(store).any { it.id == id } }?.let { store.setCur(it) }
         u.optJSONObject("star")?.let { s -> s.keys().forEach { k -> store.star[k] = s.optInt(k, 1) } }
         u.optJSONObject("co")?.let { c -> c.keys().forEach { k -> c.optJSONObject(k)?.let { store.co[k] = CoMeta.from(it) } } }
         u.optJSONArray("deletedCourses")?.let { a -> for (i in 0 until a.length()) if (!store.deletedCourses.contains(a.optString(i))) store.deletedCourses.add(a.optString(i)) }
