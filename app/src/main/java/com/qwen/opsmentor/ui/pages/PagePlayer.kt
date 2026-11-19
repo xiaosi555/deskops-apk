@@ -341,7 +341,31 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
 
     private fun toggle() {
         val ch = current() ?: return
+        if (playbackError) { start(ch, true); return }
         val v = video
+        if (playbackCompleted || (duration() > 0 && position() >= duration())) {
+            store.mediaPos["${store.cur}:${ch.id}"] = 0L
+            store.save()
+            playbackCompleted = false
+            runCatching {
+                if (v != null) {
+                    v.seekTo(0)
+                    v.start()
+                } else {
+                    val p = player ?: throw IllegalStateException("播放器已释放")
+                    if (!audioPrepared) throw IllegalStateException("音频尚未准备完成")
+                    p.seekTo(0)
+                    p.start()
+                }
+                paused = false
+                postTick()
+            }.onFailure {
+                paused = true
+                Sheets.toast(act, "无法重新播放，请重新打开本集")
+            }
+            paintPlay()
+            return
+        }
         if (v != null) {
             if (v.isPlaying) {
                 v.pause(); paused = true
