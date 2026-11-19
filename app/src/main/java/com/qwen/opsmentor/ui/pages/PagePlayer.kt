@@ -54,6 +54,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     // MediaPlayer.prepareAsync 完成前不读取 isPlaying / 不调用 start。
     private var audioPrepared = false
     private var pendingAudioStart = false
+    private var videoPrepared = false
+    private var pendingVideoStart = false
     private var activeChapterId = ""
     private var lastPositionSaveAt = 0L
     private var autoplayOnRender = false
@@ -225,30 +227,43 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         val ctx = act
         stopPlayer()
         app.reader?.stop()
-        activeChapterId = ch.id
-        lastPositionSaveAt = android.os.SystemClock.elapsedRealtime()
         val src = MediaCourses.resolve(act, store.cur, ch)
         if (src.isEmpty()) { Sheets.toast(ctx, "还没有连接文件"); return }
+        activeChapterId = ch.id
+        lastPositionSaveAt = android.os.SystemClock.elapsedRealtime()
         val uri = if (src.startsWith("/")) Uri.fromFile(File(src)) else Uri.parse(src)
         val co = Courses.find(store, store.cur)
         if (co.media == "video") {
             video?.apply {
-                setVideoURI(uri)
+                videoPrepared = false
+                pendingVideoStart = autoplay
                 setOnPreparedListener { mp ->
+                    videoPrepared = true
                     mp.isLooping = false
                     preparedVideoPlayer = mp
                     applyRate(mp)
                     restorePos(ch)
-                    paused = !autoplay
-                    if (autoplay) start()
+                    val shouldStart = autoplay || pendingVideoStart
+                    pendingVideoStart = false
+                    paused = !shouldStart
+                    if (shouldStart) start()
                     paintPlay()
                     postTick()
                 }
                 setOnCompletionListener {
+                    pendingVideoStart = false
                     paused = true
                     paintPlay()
                 }
-                setOnErrorListener { _, _, _ -> Sheets.toast(ctx, "这个格式在当前设备上播放失败，建议用 mp4"); true }
+                setOnErrorListener { _, _, _ ->
+                    videoPrepared = false
+                    pendingVideoStart = false
+                    paused = true
+                    paintPlay()
+                    Sheets.toast(ctx, "这个格式在当前设备上播放失败，建议用 mp4")
+                    true
+                }
+                setVideoURI(uri)
             }
         } else {
             player = MediaPlayer().apply {
@@ -317,7 +332,16 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         val ch = current() ?: return
         val v = video
         if (v != null) {
-            if (v.isPlaying) { v.pause(); paused = true } else { v.start(); paused = false }
+            if (v.isPlaying) {
+                v.pause(); paused = true
+                pendingVideoStart = false
+            } else if (!videoPrepared) {
+                pendingVideoStart = !pendingVideoStart
+                paused = !pendingVideoStart
+                if (pendingVideoStart) v.start() else v.pause()
+            } else {
+                v.start(); paused = false
+            }
         } else player?.let { p ->
             if (!audioPrepared) {
                 // 加载中再次点击可撤销待播放状态；不会触碰未准备完成的 MediaPlayer。
@@ -387,7 +411,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                 if (d > 0) {
                     seek?.progress = (p * 1000L / d).toInt()
                     timeLabel?.text = "${fmt(p)} / ${fmt(d)}"
-                    if (isPlaying()) app.timer.poke(store)
+                    val playing = isPlaying()
+                    if (playing) app.timer.poke(store)
                     val chapterId = activeChapterId
                     if (chapterId.isNotEmpty()) {
                         store.mediaPos["${store.cur}:${chapterId}"] = p.toLong()
@@ -396,6 +421,13 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                             lastPositionSaveAt = now
                             store.save()
                         }
+                    }
+                    // 播放结束后保存最终位置并停止轮询，避免完成状态下永久空转。
+                    if (!playing && p >= d) {
+                        if (chapterId.isNotEmpty()) store.mediaPos["${store.cur}:${chapterId}"] = d.toLong()
+                        store.save()
+                        ticker = null
+                        return
                     }
                 }
                 handler.postDelayed(this, 500)
@@ -421,6 +453,8 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         player = null
         audioPrepared = false
         pendingAudioStart = false
+        videoPrepared = false
+        pendingVideoStart = false
         preparedVideoPlayer = null
         paused = true
         activeChapterId = ""
