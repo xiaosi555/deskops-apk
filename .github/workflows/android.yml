@@ -2,7 +2,7 @@ name: Android APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/html-parity-full-rebuild]
   workflow_dispatch:
 
 permissions:
@@ -71,5 +71,16 @@ jobs:
         with:
           name: desktop-course-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Package complete Android source ZIP
+        run: git archive --format=zip --prefix=OpsMentor-Android/ HEAD > OpsMentor-Android-Source.zip
+
+      - name: Upload complete source ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-course-android-source
+          path: OpsMentor-Android-Source.zip
           if-no-files-found: error
           retention-days: 14
