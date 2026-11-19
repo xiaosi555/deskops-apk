@@ -344,7 +344,7 @@ object Exporter {
                 }
                 // 保留可读正文，同时嵌入完整档案数据块，供本应用再次导入时无损恢复。
                 readable + "\n\n---\n\n## 可恢复的完整档案数据\n\n" +
-                    "```opsmentor-json\n" + o.toString() + "\n```"
+                    "````opsmentor-json\n" + o.toString() + "\n````"
             } else archiveMd(o, scope)
             else -> archiveCsv(o, scope)
         }
