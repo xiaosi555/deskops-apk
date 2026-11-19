@@ -178,8 +178,10 @@ class PageIo(act: Activity, app: App) : Page(act, app) {
 
     private fun hint(scope: String, fmt: String): String = when (fmt) {
         "json" -> "UTF-8 编码的 ${if (scope == "all") "完整档案" else Exporter.entry(scope)?.name}，字段结构与 Web 版一致，可在另一端「导入档案」原样恢复。"
-        "md" -> "可读文档：标题层级与表格排版与学习手册一致，可粘进笔记软件或转 PDF。"
-        else -> "CSV 带 UTF-8 BOM，Excel / WPS 直接打开不乱码；一行一条。"
+        "md" -> if (scope == "all") "可读文档正文 + 可恢复的完整档案数据块；再次导入本应用可还原多门课程、学习记录与个人设置。"
+            else "可读文档：标题层级与表格排版与学习手册一致，可粘进笔记软件或转 PDF。"
+        else -> if (scope == "all") "完整档案 CSV：以标准 CSV 封装完整 JSON，保留全部课程、各课程学习状态与个人设置，可再次导入恢复；Excel / WPS 可打开查看。"
+            else "CSV 带 UTF-8 BOM，Excel / WPS 直接打开不乱码；适合逐条查看与整理。"
     }
 
     private fun importPage(host: LinearLayout) {
@@ -191,7 +193,7 @@ class PageIo(act: Activity, app: App) : Page(act, app) {
         })
         hd.addView(pill(ctx, "合并 / 覆盖", true))
         c.addView(hd)
-        c.addView(muted(ctx, "支持本应用导出的完整档案 / 课程资料 / 局部档案（划线、进度、案例）。粘贴 JSON 文本，或从本机选择 .json 文件。"),
+        c.addView(muted(ctx, "支持本应用导出的完整档案与局部档案，格式包括 JSON、Markdown、CSV。可粘贴文本，也可从本机选择对应文件；完整 CSV 会按原档案结构恢复多门课程与个人设置。"),
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) })
         val ta = Sheets.input(ctx, impText, "粘贴存档 JSON，或点下方「选择文件」", 0, true)
         ta.minLines = 6
@@ -241,7 +243,7 @@ class PageIo(act: Activity, app: App) : Page(act, app) {
         val go = btn(ctx, "应用存档", "pri")
         go.setOnClickListener {
             try {
-                val r = Importer.apply(store, app.packs, p.obj, impMode)
+                val r = Importer.apply(ctx, store, app.packs, p.obj, impMode)
                 app.retheme()
                 msg = r.summaryText()
                 parsed = null; impText = ""
@@ -293,12 +295,12 @@ class PagePersonalData(act: Activity, app: App) : Page(act, app) {
         row.setPadding(0, ctx.dp(12f), 0, 0)
         row.addView(btn(ctx, "预览个人数据 JSON", "pri").also {
             it.setOnClickListener {
-                val text = Exporter.personalJson(store)
+                val text = Exporter.personalJson(store, app.packs)
                 Saver.export(ctx, "个人数据 · JSON 存档", "个人数据-${Store.today()}.json", "json", text)
             }
         })
         row.addView(btn(ctx, "导出全量备份", "n").also {
-            it.setOnClickListener { Saver.export(ctx, "全量备份 · JSON", "桌面运维-学习存档-${Store.today()}.json", "json", Exporter.backupJson(store)) }
+            it.setOnClickListener { Saver.export(ctx, "全量备份 · JSON", "桌面运维-学习存档-${Store.today()}.json", "json", Exporter.backupJson(store, app.packs)) }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.marginStart = ctx.dp(8f) })
         c.addView(row)
         c.addView(noteBox(ctx, "提示", "个人数据不含媒体文件本体；导入到另一台设备后，视频 / 语音课程需要重新连接文件。"))
@@ -326,25 +328,40 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
         val (from, to, label2) = range(now)
         val days = daysBetween(from, to)
         val tabs = hrow(ctx)
-        listOf("day" to "日", "week" to "周", "month" to "月", "year" to "年").forEach { (k, n) ->
-            tabs.addView(chip(ctx, n, mode == k) { mode = k; off = 0; rerender(true) },
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also {
-                    if (tabs.childCount > 0) it.marginStart = ctx.dp(6f)
-                })
+        listOf("day" to "日", "week" to "周", "month" to "月", "year" to "年").forEachIndexed { index, (k, n) ->
+            val selected = mode == k
+            val item = vcol(ctx).apply { gravity = Gravity.CENTER_HORIZONTAL; isClickable = true }
+            val title = label(ctx, n, 15.5f, if (selected) Tokens.pri else Tokens.sub,
+                if (selected) Tokens.weightH() else Tokens.weightB())
+            title.setPadding(0, ctx.dp(10f), 0, ctx.dp(11f))
+            item.addView(title)
+            item.addView(View(ctx).apply { flat(if (selected) Tokens.pri else android.graphics.Color.TRANSPARENT, 1.5f) },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(2f)))
+            item.setOnClickListener { mode = k; off = 0; rerender(true) }
+            tabs.addView(item, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
+                if (index > 0) it.marginStart = ctx.dp(26f)
+            })
         }
-        host.addView(tabs, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(12f) })
+        host.addView(tabs, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(4f) })
+        host.addView(View(ctx).apply { flat(Tokens.hairc, 1f) },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(1f)))
         // 区间导航
         val nav = hrow(ctx)
-        nav.setPadding(0, ctx.dp(12f), 0, 0)
-        nav.addView(btn(ctx, "‹", "n", small = true).also { it.setOnClickListener { off--; rerender(false) } })
-        nav.addView(label(ctx, label2, 15f, Tokens.ink, Tokens.weightH()).also {
-            it.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.marginStart = ctx.dp(8f) })
+        nav.gravity = Gravity.CENTER_VERTICAL
+        nav.setPadding(0, ctx.dp(18f), 0, ctx.dp(6f))
+        nav.addView(btn(ctx, "‹", "n", small = true).also { it.setOnClickListener { off--; rerender(false) } },
+            LinearLayout.LayoutParams(ctx.dp(38f), ctx.dp(38f)))
+        val period = label(ctx, label2, 16f, Tokens.ink, Tokens.weightM()).apply {
+            gravity = Gravity.CENTER
+            isClickable = true
+            setOnClickListener { if (off != 0) { off = 0; rerender(false) } }
+        }
+        nav.addView(period, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         nav.addView(btn(ctx, "›", "n", small = true).also {
             it.isEnabled = off < 0
-            it.alpha = if (off < 0) 1f else 0.35f
+            it.alpha = if (off < 0) 1f else 0.25f
             it.setOnClickListener { if (off < 0) { off++; rerender(false) } }
-        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.marginStart = ctx.dp(8f) })
+        }, LinearLayout.LayoutParams(ctx.dp(38f), ctx.dp(38f)))
         host.addView(nav)
         // 汇总
         val mins = LinkedHashMap<String, Int>()
@@ -357,18 +374,18 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
         val total = mins.values.sum()
         val active = mins.values.count { it > 0 }
         val learned = learnedIn(from, to)
-        val sum = card(host, 16f, 12)
-        val big = label(ctx, fmtDur(total), 30f, Tokens.ink, Tokens.weightH())
+        val sum = calendarBlock(host, 8)
+        val big = label(ctx, fmtDur(total), 34f, Tokens.ink, Tokens.weightH())
         sum.addView(big)
         sum.addView(muted(ctx, if (mode == "day") "学习章节 ${learned.size} 个" else "$active 天有学习 · 日均 ${fmtDur(if (active > 0) total / active else 0)} · 章节 ${learned.size} 个"),
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(4f) })
         // 图表
         if (mode == "week" || mode == "year") {
-            val items = ArrayList<Pair<String, Int>>()
+            val items = ArrayList<Triple<String, Int, Boolean>>()
             if (mode == "week") {
                 for (i in 0..6) {
                     val d = dayAt(from, i)
-                    items.add("一二三四五六日"[i].toString() + (if (fmt.format(d) == fmt.format(Date())) "·今" else "") to minutesOf(fmt.format(d)))
+                    items.add(Triple("一二三四五六日"[i].toString(), minutesOf(fmt.format(d)), fmt.format(d) == fmt.format(Date())))
                 }
             } else {
                 val y = Calendar.getInstance().apply { add(Calendar.YEAR, off) }.get(Calendar.YEAR)
@@ -378,33 +395,45 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
                     while (c2.get(Calendar.MONTH) == mth) {
                         v += minutesOf(fmt.format(c2.time)); c2.add(Calendar.DAY_OF_MONTH, 1)
                     }
-                    items.add("${mth + 1}" to v)
+                    items.add(Triple("${mth + 1}", v, y == Calendar.getInstance().get(Calendar.YEAR) && mth == Calendar.getInstance().get(Calendar.MONTH)))
                 }
             }
             val mx = items.maxOf { it.second }.coerceAtLeast(1)
             val bars = hrow(ctx)
-            bars.setPadding(0, ctx.dp(14f), 0, 0)
-            items.forEach { (l, v) ->
+            bars.clipChildren = false
+            items.forEach { (l, v, isNow) ->
                 val col = vcol(ctx)
                 col.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                col.addView(label(ctx, if (v > 0) shortDur(v) else "", 10.5f, Tokens.sub), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-                val fill = View(ctx)
-                val h = ctx.dp(6f) + (if (v > 0) (v.toFloat() / mx * 96f) else 0f)
-                fill.flat(if (v > 0) Tokens.pri else Tokens.withAlpha(Tokens.sub, 0.15f), 3f)
-                col.addView(fill, LinearLayout.LayoutParams(ctx.dp(14f), h.toInt()))
-                col.addView(label(ctx, l, 11f, Tokens.sub), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(4f) })
-                bars.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+                col.addView(label(ctx, if (v > 0) shortDur(v) else "", 10.5f, Tokens.sub),
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ctx.dp(14f)))
+                val bar = FrameLayout(ctx).apply {
+                    flat(Tokens.withAlpha(Tokens.pri, 0.07f), 3f)
+                }
+                if (v > 0) {
+                    val fillHeight = maxOf(ctx.dp(4f), (ctx.dp(100f) * v.toFloat() / mx).toInt())
+                    bar.addView(View(ctx).apply { flat(Tokens.withAlpha(Tokens.pri, 0.78f), 3f) },
+                        FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, fillHeight, Gravity.BOTTOM))
+                }
+                col.addView(bar, LinearLayout.LayoutParams(ctx.dp(22f), ctx.dp(100f)))
+                col.addView(label(ctx, l, 12f, if (isNow) Tokens.pri else Tokens.sub,
+                    if (isNow) Tokens.weightM() else 400),
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
+                bars.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).also {
+                    it.marginStart = if (bars.childCount > 0) ctx.dp(6f) else 0
+                })
             }
-            sum.addView(bars, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(150f)).also { it.topMargin = ctx.dp(10f) })
+            sum.addView(bars, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(168f)).also {
+                it.topMargin = ctx.dp(22f); it.bottomMargin = ctx.dp(26f)
+            })
         }
         if (mode == "month") {
             sum.addView(monthGrid(ctx, from), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(12f) })
         }
         // 明细
-        val log = card(host, 16f, 12)
+        val log = calendarBlock(host, 10)
         if (mode == "day") {
             val key = fmt.format(from)
-            log.addView(label(ctx, "当日学习", 15.5f, Tokens.ink, Tokens.weightH()))
+            log.addView(label(ctx, "当日学习", 13f, Tokens.sub, 400))
             val ids = learnedOn(key)
             if (ids.isEmpty()) log.addView(muted(ctx, "当天没有完成章节学习的记录。"), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
             ids.forEach { id ->
@@ -422,7 +451,7 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
                 }
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(12f) })
         } else {
-            log.addView(label(ctx, "这段时间的学习记录", 15.5f, Tokens.ink, Tokens.weightH()))
+            log.addView(label(ctx, "这段时间的学习记录", 13f, Tokens.sub, 400))
             val keys = ArrayList<String>()
             var i = 0
             while (i <= days) {
@@ -434,35 +463,38 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
             keys.reversed().take(12).forEach { k ->
                 val r = hrow(ctx)
-                r.addView(label(ctx, k.substring(5).replace("-", "月") + "日", 14f, Tokens.ink, Tokens.weightM()).also {
+                r.gravity = Gravity.CENTER_VERTICAL
+                r.setPadding(0, ctx.dp(14f), 0, ctx.dp(14f))
+                r.addView(label(ctx, k.substring(5).replace("-", "月") + "日", 15.5f, Tokens.ink, Tokens.weightM()).also {
                     it.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                r.addView(muted(ctx, fmtDur(minutesOf(k)) + (if (learnedOn(k).isNotEmpty()) " · ${learnedOn(k).size} 章" else "")))
+                r.addView(muted(ctx, fmtDur(minutesOf(k)) + (if (learnedOn(k).isNotEmpty()) " · ${learnedOn(k).size} 章" else ""), 13.5f))
                 r.isClickable = true
                 r.setOnClickListener {
                     val target = fmt.parse(k) ?: return@setOnClickListener
-                    off = daysBetween(target, Date()).let { if (it > 0) -1 else 0 }
                     mode = "day"
-                    calOverride = target
+                    off = dayOffset(target)
                     rerender(false)
                 }
-                log.addView(r, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(6f) })
+                log.addView(r, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                log.addView(View(ctx).apply { flat(Tokens.hairc, 1f) },
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(1f)))
             }
         }
         log.addView(muted(ctx, "时长在阅读章节、复习、划线等学习页面自动记录；离开页面或 2 分钟无操作时暂停。"),
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(10f) })
     }
 
-    private var calOverride: Date? = null
-
     /** 区间：返回起止与标题 */
     private fun range(now: Calendar): Triple<Date, Date, String> {
-        calOverride?.let { d ->
-            calOverride = null
-            return Triple(d, d, SimpleDateFormat("yyyy年M月d日", Locale.CHINA).format(d))
-        }
         val c = now.clone() as Calendar
-        c.add(Calendar.DAY_OF_YEAR, off)
+        // 每种视图按自己的时间单位移动：日/周/月/年分别偏移，不把周/月误当成一天。
+        when (mode) {
+            "day" -> c.add(Calendar.DAY_OF_YEAR, off)
+            "week" -> c.add(Calendar.WEEK_OF_YEAR, off)
+            "month" -> c.add(Calendar.MONTH, off)
+            "year" -> c.add(Calendar.YEAR, off)
+        }
         return when (mode) {
             "day" -> Triple(c.time, c.time, SimpleDateFormat("yyyy年M月d日", Locale.CHINA).format(c.time))
             "month" -> {
@@ -496,15 +528,30 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
         return c.time
     }
 
+    private fun calendarBlock(host: LinearLayout, top: Int): LinearLayout {
+        if (!Tokens.planet) return card(host, 16f, 12)
+        return vcol(act).also { panel ->
+            host.addView(panel, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).also { it.topMargin = act.dp(top.toFloat()) })
+        }
+    }
+
+    private fun dayOffset(target: Date): Int {
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }
+        val selected = Calendar.getInstance().apply {
+            time = target
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }
+        return Math.round((selected.timeInMillis - today.timeInMillis) / 86400000.0).toInt()
+    }
+
     private fun daysBetween(a: Date, b: Date): Int =
         Math.round((b.time - a.time) / 86400000.0).toInt().coerceAtLeast(0)
 
-    private fun minutesOf(day: String): Int = (store.studyLog[day] ?: 0) + autoMinutes(day)
-
-    /** 自动累计的分钟数（与人工校正值合并取较大者） */
-    private fun autoMinutes(day: String): Int = store.bags.values.sumOf { bag ->
-        bag.learn.values.count { it.at == day } * 12
-    }
+    private fun minutesOf(day: String): Int = store.studyLog[day] ?: 0
 
     private fun learnedOn(day: String): List<String> =
         store.bags[store.cur]?.learn?.filterValues { it.at == day }?.keys?.toList() ?: emptyList()
@@ -547,20 +594,25 @@ class PageCalendar(act: Activity, app: App) : Page(act, app) {
             val v = minutesOf(key)
             val cell = vcol(ctx)
             cell.gravity = Gravity.CENTER
-            cell.flat(if (key == fmt.format(Date())) Tokens.priSoft else if (v > 0) Tokens.withAlpha(Tokens.pri, 0.07f) else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(8f).toFloat())
+            cell.minimumHeight = ctx.dp(52f)
+            if (Tokens.planet) cell.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            else cell.flat(if (key == fmt.format(Date())) Tokens.priSoft else if (v > 0) Tokens.withAlpha(Tokens.pri, 0.07f) else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(8f).toFloat())
             cell.setPadding(0, ctx.dp(6f), 0, ctx.dp(6f))
-            cell.addView(label(ctx, "$d", 13f, if (v > 0) Tokens.pri else Tokens.ink, if (v > 0) Tokens.weightM() else Tokens.weightB()))
-            if (v > 0) cell.addView(label(ctx, shortDur(v), 9.5f, Tokens.sub))
+            val hasStudy = v > 0 || learnedOn(key).isNotEmpty()
+            val active = key == fmt.format(Date())
+            cell.addView(label(ctx, "$d", 13f, if (active || hasStudy) Tokens.pri else Tokens.ink,
+                if (active) Tokens.weightH() else if (hasStudy) Tokens.weightM() else Tokens.weightB()))
+            cell.addView(label(ctx, if (v > 0) shortDur(v) else "", 10f, Tokens.sub))
             val mine = cell
             cell.isClickable = true
-            cell.setOnClickListener { mode = "day"; calOverride = day; rerender(false) }
+            cell.setOnClickListener { mode = "day"; off = dayOffset(day); rerender(false) }
             cells.add(mine)
         }
         while (cells.size % 7 != 0) cells.add(View(ctx))
         cells.chunked(7).forEach { row ->
             val r = hrow(ctx)
             row.forEach { c2 ->
-                r.addView(c2, LinearLayout.LayoutParams(0, ctx.dp(42f), 1f).also { it.marginEnd = ctx.dp(3f); it.topMargin = ctx.dp(3f) })
+                r.addView(c2, LinearLayout.LayoutParams(0, ctx.dp(52f), 1f).also { it.marginEnd = ctx.dp(5f); it.topMargin = ctx.dp(5f) })
             }
             grid.addView(r)
         }
@@ -585,70 +637,116 @@ class PageSettings(act: Activity, app: App) : Page(act, app) {
     override fun body(host: LinearLayout) {
         val ctx = act
         // 主题色
-        val c1 = card(host, 16f, 12)
-        c1.addView(label(ctx, "主题色", 15.5f, Tokens.ink, Tokens.weightH()))
+        val c1 = settingsSection(host, 12)
+        c1.addView(settingsTitle(ctx, "主题色"))
         val grid = vcol(ctx)
         var row = hrow(ctx)
         c1.addView(grid, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) })
         Tokens.PALETTE.forEachIndexed { i, hex ->
-            val b = FrameLayout(ctx).apply {
-                flat(if (i == store.accent) Tokens.withAlpha(hex, 0.14f) else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(10f).toFloat())
-                isClickable = true
+            val selected = store.accent == i
+            val swatch = FrameLayout(ctx).apply {
+                flat(if (selected) Tokens.withAlpha(hex, 0.14f) else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(10f).toFloat())
             }
-            val dot = View(ctx).apply { flat(hex, 7f) }
-            b.addView(dot, FrameLayout.LayoutParams(ctx.dp(22f), ctx.dp(22f)).also { it.gravity = Gravity.CENTER })
-            val name = label(ctx, Tokens.PALETTE_NAMES[i], 10.5f, if (i == store.accent) Tokens.pri else Tokens.sub, if (i == store.accent) Tokens.weightM() else 400)
+            val dot = View(ctx).apply { flat(hex, 8f) }
+            swatch.addView(dot, FrameLayout.LayoutParams(ctx.dp(22f), ctx.dp(22f)).also { it.gravity = Gravity.CENTER })
+            val name = label(ctx, Tokens.PALETTE_NAMES[i], 11f, if (selected) Tokens.pri else Tokens.sub, if (selected) Tokens.weightM() else 400)
             name.gravity = Gravity.CENTER
-            val col = vcol(ctx)
-            col.gravity = Gravity.CENTER
-            col.addView(b, LinearLayout.LayoutParams(ctx.dp(52f), ctx.dp(44f)))
+            val col = vcol(ctx).apply { gravity = Gravity.CENTER }
+            col.addView(swatch, LinearLayout.LayoutParams(ctx.dp(52f), ctx.dp(44f)))
             col.addView(name)
             col.isClickable = true
             col.setOnClickListener {
                 store.accent = i
+                store.accentCustom = ""
                 store.save(); app.retheme(); rerender(false)
             }
-            if (i % 4 == 0) {
+            if (i % 3 == 0) {
                 row = hrow(ctx)
                 grid.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
-                    it.topMargin = ctx.dp(6f)
+                    it.topMargin = ctx.dp(8f)
                 })
             }
             row.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also {
                 if (row.childCount > 0) it.marginStart = ctx.dp(4f)
             })
-            if (i == Tokens.PALETTE.size - 1) repeat(3 - (row.childCount - 1)) {
-                row.addView(View(ctx), LinearLayout.LayoutParams(0, 1, 1f).also { it.marginStart = ctx.dp(4f) })
+        }
+        // HTML 支持自定义主色；输入六位 HEX 后由同一套令牌引擎派生所有辅助色。
+        val customRow = hrow(ctx)
+        grid.addView(customRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
+            it.topMargin = ctx.dp(8f)
+        })
+        val customSelected = store.accent == -1
+        val customHex = store.accentCustom.takeIf { it.matches(Regex("#[0-9a-fA-F]{6}")) } ?: "#00B56A"
+        val customColor = runCatching { Color.parseColor(customHex) }.getOrDefault(Tokens.pri)
+        val customSwatch = FrameLayout(ctx).apply {
+            flat(if (customSelected) Tokens.withAlpha(customColor, 0.16f) else Tokens.withAlpha(Tokens.ink, 0.03f), ctx.dp(10f).toFloat())
+        }
+        customSwatch.addView(View(ctx).apply { flat(customColor, 8f) },
+            FrameLayout.LayoutParams(ctx.dp(22f), ctx.dp(22f)).also { it.gravity = Gravity.CENTER })
+        val customName = label(ctx, "自定义", 11f, if (customSelected) Tokens.pri else Tokens.sub, if (customSelected) Tokens.weightM() else 400).apply { gravity = Gravity.CENTER }
+        val customCol = vcol(ctx).apply { gravity = Gravity.CENTER; isClickable = true }
+        customCol.addView(customSwatch, LinearLayout.LayoutParams(ctx.dp(52f), ctx.dp(44f)))
+        customCol.addView(customName)
+        customCol.setOnClickListener {
+            Sheets.prompt(ctx, "自定义主题色", store.accentCustom.ifBlank { "#00B56A" }, 7, "输入 #RRGGBB", "应用") { value ->
+                val hex = if (value.startsWith("#")) value else "#$value"
+                if (!hex.matches(Regex("#[0-9a-fA-F]{6}"))) {
+                    Sheets.toast(ctx, "请输入有效的六位 HEX 颜色，例如 #00B56A")
+                } else {
+                    store.accent = -1
+                    store.accentCustom = hex.uppercase()
+                    store.save(); app.retheme(); rerender(false)
+                }
             }
         }
+        customRow.addView(customCol, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        repeat(2) { customRow.addView(View(ctx), LinearLayout.LayoutParams(0, 1, 1f).also { it.marginStart = ctx.dp(4f) }) }
         // 外观
-        val c2 = card(host, 16f, 10)
-        c2.addView(label(ctx, "外观", 15.5f, Tokens.ink, Tokens.weightH()))
-        c2.addView(trio(listOf(
-            Triple("system", "跟随系统", "auto"), Triple("light", "亮色", "sun"), Triple("dark", "暗色", "moon"),
-        ), when (store.appearance) {
-            Appearance.SYSTEM -> "system"; Appearance.LIGHT -> "light"; Appearance.DARK -> "dark"
-        }) { v ->
-            store.appearance = when (v) {
-                "light" -> Appearance.LIGHT; "dark" -> Appearance.DARK; else -> Appearance.SYSTEM
-            }
-            store.theme = if (v == "dark") "dark" else "light"
+        val c2 = settingsSection(host, 10)
+        c2.addView(settingsTitle(ctx, "外观"))
+        val appearanceRow = hrow(ctx)
+        appearanceRow.addView(label(ctx, "夜间模式", 15f, Tokens.ink, Tokens.weightM()),
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val darkSwitch = FrameLayout(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams(ctx.dp(46f), ctx.dp(26f))
+        }
+        fun paintDarkSwitch() {
+            val enabled = Tokens.dark
+            darkSwitch.flat(if (enabled) Tokens.pri else Tokens.withAlpha(Tokens.sub, 0.25f), ctx.dp(13f).toFloat())
+            darkSwitch.removeAllViews()
+            darkSwitch.addView(View(ctx).apply { flat(0xFFFFFFFF.toInt(), ctx.dp(10f).toFloat()) },
+                FrameLayout.LayoutParams(ctx.dp(20f), ctx.dp(20f)).also {
+                    it.gravity = if (enabled) Gravity.END else Gravity.START
+                    it.marginStart = ctx.dp(3f); it.marginEnd = ctx.dp(3f)
+                })
+        }
+        paintDarkSwitch()
+        darkSwitch.isClickable = true
+        darkSwitch.setOnClickListener {
+            store.appearance = if (Tokens.dark) Appearance.LIGHT else Appearance.DARK
+            store.theme = if (Tokens.dark) "light" else "dark"
             store.save(); app.retheme(); rerender(false)
-        })
+        }
+        appearanceRow.addView(darkSwitch)
+        c2.addView(appearanceRow)
         // 主题风格
-        val c3 = card(host, 16f, 10)
-        c3.addView(label(ctx, "主题", 15.5f, Tokens.ink, Tokens.weightH()))
-        c3.addView(trio(listOf(
-            Triple("minimal", "极简版", "克制、留白、轻量层级"),
-            Triple("planet", "星球版", "播客式大标题与封面列表"),
-        ), if (store.style == StyleMode.PLANET) "planet" else "minimal") { v ->
-            store.style = if (v == "minimal") StyleMode.MINIMAL else StyleMode.PLANET
+        val c3 = settingsSection(host, 10)
+        c3.addView(settingsTitle(ctx, "主题"))
+        c3.addView(Rows.list(ctx, "leaf", "极简版", "保持克制、留白与轻量层级",
+            if (store.style == StyleMode.MINIMAL) "使用中" else "") {
+            store.style = StyleMode.MINIMAL
             store.save(); app.retheme(); rerender(false)
-            Sheets.toast(ctx, if (v == "planet") "已切换星球版" else "已切换极简版")
+            Sheets.toast(ctx, "已切换极简版")
+        })
+        c3.addView(Rows.list(ctx, "orbit", "星球版", "播客式内容流：大标题、封面列表、进度播放条",
+            if (store.style == StyleMode.PLANET) "使用中" else "") {
+            store.style = StyleMode.PLANET
+            store.save(); app.retheme(); rerender(false)
+            Sheets.toast(ctx, "已切换星球版")
         })
         // 顶部装饰
-        val c4 = card(host, 16f, 10)
-        c4.addView(label(ctx, "顶部装饰", 15.5f, Tokens.ink, Tokens.weightH()))
+        val c4 = settingsSection(host, 10)
+        c4.addView(settingsTitle(ctx, "顶部装饰"))
         val dg = vcol(ctx)
         DECOS.chunked(4).forEach { row ->
             val r = hrow(ctx)
@@ -667,7 +765,7 @@ class PageSettings(act: Activity, app: App) : Page(act, app) {
         }
         c4.addView(dg)
         // 状态栏留白
-        val c5 = card(host, 16f, 10)
+        val c5 = settingsSection(host, 10)
         val sw = hrow(ctx)
         val swTitle = label(ctx, "顶部状态栏留白", 15f, Tokens.ink, Tokens.weightM())
         swTitle.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -692,7 +790,30 @@ class PageSettings(act: Activity, app: App) : Page(act, app) {
         c5.addView(sw)
         c5.addView(muted(ctx, "关闭后内容顶到状态栏下，适合全面屏沉浸式阅读；系统状态栏图标对比度会自动调整。"),
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) })
+
+        val c6 = settingsSection(host, 10)
+        c6.addView(settingsTitle(ctx, "数据"))
+        c6.addView(Rows.list(ctx, "database", "数据", "课程、学习手册、划线、进度、案例与术语", "") {
+            (act as? MainActivity)?.nav("io")
+        })
     }
+
+    private fun settingsSection(host: LinearLayout, top: Int): LinearLayout {
+        if (!Tokens.planet) return card(host, 16f, top)
+        return vcol(act).also { panel ->
+            panel.layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).also { it.bottomMargin = act.dp(34f) }
+            host.addView(panel)
+        }
+    }
+
+    private fun settingsTitle(ctx: Activity, text: String): View =
+        label(ctx, text, if (Tokens.planet) 13f else 15.5f,
+            if (Tokens.planet) Tokens.sub else Tokens.ink,
+            if (Tokens.planet) 400 else Tokens.weightH()).also {
+            if (Tokens.planet) it.setPadding(0, 0, 0, ctx.dp(14f))
+        }
 
     private fun trio(items: List<Triple<String, String, String>>, value: String, onPick: (String) -> Unit): View {
         val ctx = act
@@ -807,6 +928,27 @@ class PageCourseImport(act: Activity, app: App) : Page(act, app) {
     private var sortKey = "name"
     private var sortAsc = true
 
+    /** 媒体导入后按设置保存应用内副本，并探测时长；所有文件 IO 均在后台执行。 */
+    private fun finishMediaImport(courseId: String, kind: String, count: Int) {
+        val ctx = act
+        if (store.mediaKeep) {
+            Sheets.toast(ctx, "课程已建立，正在保存媒体到应用内…")
+            Thread {
+                val copied = runCatching { MediaCourses.copyInto(ctx, app, courseId) }.getOrDefault(0)
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    if (copied >= count) {
+                        Sheets.toast(ctx, "已保存 $copied 个文件到应用内，可离线播放")
+                    } else {
+                        Sheets.toast(ctx, "已保存 $copied / $count 个文件；未保存的文件仍保留原位置")
+                    }
+                    MediaCourses.probeDuration(ctx, app, courseId) {}
+                }
+            }.start()
+        } else {
+            MediaCourses.probeDuration(ctx, app, courseId) {}
+        }
+    }
+
     override fun body(host: LinearLayout) {
         val ctx = act
         val tabs = hrow(ctx)
@@ -843,7 +985,7 @@ class PageCourseImport(act: Activity, app: App) : Page(act, app) {
                 val p = Importer.parse(text)
                 if (p.err.isNotEmpty()) { Sheets.toast(ctx, if (p.err.length > 26) p.err.take(26) + "…" else p.err); return@setOnClickListener }
                 if (!p.full) { Sheets.toast(ctx, "这是局部档案（划线 / 进度 / 案例），请到「数据 → 导入档案」导入"); return@setOnClickListener }
-                val r = Importer.apply(store, app.packs, p.obj, "merge")
+                val r = Importer.apply(ctx, store, app.packs, p.obj, "merge")
                 if (r.created.isEmpty()) { Sheets.toast(ctx, "没有可导入的课程（需要 title）"); return@setOnClickListener }
                 r.created.forEach { id ->
                     store.co[id] = (store.co[id] ?: com.qwen.opsmentor.state.CoMeta()).apply { glyph = this@PageCourseImport.glyph }
@@ -884,33 +1026,51 @@ class PageCourseImport(act: Activity, app: App) : Page(act, app) {
         c.addView(muted(ctx, "读取手机里的视频 / 音频文件夹建课：文件名即章节名，按名称自然排序（1、2、10 排在正确位置）。文件只在本机读取，不会上传。"))
         val row = btnRow(ctx)
         row.setPadding(0, ctx.dp(10f), 0, 0)
-        row.addView(btn(ctx, "选择文件夹", "pri").also {
-            it.setOnClickListener {
-                (act as MainActivity).pickTree { uri ->
-                    if (uri == null) return@pickTree
-                    val items = MediaCourses.scan(ctx, uri, kind)
-                    if (items.isEmpty()) { Sheets.toast(ctx, "没有在这个文件夹里找到${if (kind == "video") "视频" else "音频"}文件；可点下方「改选单个文件」"); return@pickTree }
-                    if (mediaTitle.isBlank()) mediaTitle = MediaCourses.displayName(ctx, uri)
-                    mediaTitle.let { t ->
-                        val id = MediaCourses.createCourse(app, kind, t.ifBlank { if (kind == "video") "视频课程" else "语音课程" }, items, glyph)
+        val folderButton = btn(ctx, "选择文件夹", "pri")
+        folderButton.setOnClickListener {
+            (act as MainActivity).pickTree { uri ->
+                if (uri == null) return@pickTree
+                folderButton.isEnabled = false
+                folderButton.alpha = 0.65f
+                Sheets.toast(ctx, "正在扫描文件夹，请稍候…")
+                Thread {
+                    val result = runCatching { MediaCourses.scan(ctx, uri, kind) }
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        folderButton.isEnabled = true
+                        folderButton.alpha = 1f
+                        val items = result.getOrElse {
+                            Sheets.toast(ctx, "文件夹读取失败，请检查授权后重试")
+                            return@post
+                        }
+                        if (items.isEmpty()) {
+                            Sheets.toast(ctx, "没有找到可用的${if (kind == "video") "视频" else "音频"}文件；可点下方「改选单个文件」")
+                            return@post
+                        }
+                        if (mediaTitle.isBlank()) mediaTitle = MediaCourses.displayName(ctx, uri)
+                        val title = mediaTitle.ifBlank { if (kind == "video") "视频课程" else "语音课程" }
+                        val id = MediaCourses.createCourse(app, kind, title, MediaCourses.sortItems(items, sortKey, sortAsc), glyph)
                         if (id != null) {
-                            store.cmTab = kind; store.save()
-                            Sheets.popCheck(ctx, "已导入${if (kind == "video") "视频" else "语音"}课程")
+                            store.cmTab = kind
+                            store.save()
+                            Sheets.popCheck(ctx, "已导入${if (kind == "video") "视频" else "语音"}课程 · ${items.size} 个文件")
+                            finishMediaImport(id, kind, items.size)
                             (act as MainActivity).goBack()
                         } else Sheets.toast(ctx, "建课失败")
                     }
-                }
+                }.start()
             }
-        })
+        }
+        row.addView(folderButton)
         row.addView(btn(ctx, "改选单个文件", "n").also {
             it.setOnClickListener {
                 (act as MainActivity).pickMedia(kind) { uris ->
                     if (uris.isNullOrEmpty()) { Sheets.toast(ctx, "没有选到可用文件"); return@pickMedia }
-                    val items = MediaCourses.fromUris(ctx, uris, kind)
+                    val items = MediaCourses.sortItems(MediaCourses.fromUris(ctx, uris, kind), sortKey, sortAsc)
                     val id = MediaCourses.createCourse(app, kind, mediaTitle.ifBlank { if (kind == "video") "视频课程" else "语音课程" }, items, glyph)
                     if (id != null) {
                         store.cmTab = kind; store.save()
                         Sheets.popCheck(ctx, "已导入${items.size} 个文件")
+                        finishMediaImport(id, kind, items.size)
                         (act as MainActivity).goBack()
                     }
                 }

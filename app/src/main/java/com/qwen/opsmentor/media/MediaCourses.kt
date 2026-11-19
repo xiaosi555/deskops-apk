@@ -2,6 +2,7 @@ package com.qwen.opsmentor.media
 import com.qwen.opsmentor.data.toJson
 
 import android.content.Context
+import android.util.Base64
 import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -36,36 +37,56 @@ object MediaCourses {
     fun isMedia(name: String, kind: String): Boolean =
         ext(name) in (if (kind == "video") VIDEO_EXT else AUDIO_EXT)
 
-    /** 扫描文件夹（一层 + 递归一层常见子目录） */
+    /** 扫描文件夹：读取根目录及其下一层常见子目录，避免深层目录造成超长等待。 */
     fun scan(ctx: Context, tree: Uri, kind: String): List<MediaItem> {
         val out = ArrayList<MediaItem>()
-        val base = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-        val cur = ctx.contentResolver.query(base, arrayOf(
+        val visited = HashSet<String>()
+        val projection = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
             DocumentsContract.Document.COLUMN_SIZE,
             DocumentsContract.Document.COLUMN_LAST_MODIFIED,
             DocumentsContract.Document.COLUMN_MIME_TYPE,
-        ), null, null, null)
-        cur?.use { c ->
-            val iName = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-            val iSize = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE)
-            val iTime = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-            val iMime = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
-            val iId = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-            while (c.moveToNext()) {
-                val name = c.getString(iName) ?: continue
-                val mime = c.getString(iMime) ?: ""
-                val isDir = DocumentsContract.Document.MIME_TYPE_DIR == mime
-                if (isDir) continue
-                if (!isMedia(name, kind) && !(kind == "video" && mime.startsWith("video/")) && !(kind == "audio" && mime.startsWith("audio/"))) continue
-                out.add(MediaItem(
-                    DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(iId)),
-                    name, c.getLong(iSize), c.getLong(iTime), kind,
-                ))
+        )
+
+        fun scanDirectory(parentId: String, depth: Int) {
+            if (!visited.add(parentId)) return
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId)
+            runCatching {
+                ctx.contentResolver.query(children, projection, null, null, null)?.use { c ->
+                    val iId = c.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                    val iName = c.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                    val iSize = c.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                    val iTime = c.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                    val iMime = c.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                    if (iId < 0 || iName < 0 || iMime < 0) return@use
+
+                    while (c.moveToNext() && out.size < 5000) {
+                        val documentId = c.getString(iId) ?: continue
+                        val name = c.getString(iName) ?: continue
+                        val mime = if (iMime >= 0) c.getString(iMime).orEmpty() else ""
+                        if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                            // 根目录下的一层子目录也纳入扫描；不无限递归，避免误扫大型媒体库。
+                            if (depth < 8 && out.size < 5000) scanDirectory(documentId, depth + 1)
+                            continue
+                        }
+                        val matchesMime = (kind == "video" && mime.startsWith("video/")) ||
+                            (kind == "audio" && mime.startsWith("audio/"))
+                        if (!isMedia(name, kind) && !matchesMime) continue
+                        out.add(MediaItem(
+                            DocumentsContract.buildDocumentUriUsingTree(tree, documentId),
+                            name,
+                            if (iSize >= 0) c.getLong(iSize) else 0L,
+                            if (iTime >= 0) c.getLong(iTime) else 0L,
+                            kind,
+                        ))
+                    }
+                }
             }
         }
-        return sortItems(out, "name", true)
+
+        runCatching { scanDirectory(DocumentsContract.getTreeDocumentId(tree), 0) }
+        return sortItems(out.distinctBy { it.uri.toString() }, "name", true)
     }
 
     fun fromUris(ctx: Context, uris: List<Uri>, kind: String): List<MediaItem> =
@@ -89,9 +110,8 @@ object MediaCourses {
     }
 
     private fun naturalKey(name: String): String {
-        val m = Regex("(\\d+)").findAll(name.substringBeforeLast('.')).map { it.value.toInt() }.toList()
-        val p = if (m.isEmpty()) intArrayOf() else m.toIntArray()
-        return p.joinToString("-") { it.toString().padStart(6, '0') } + "#" + name.lowercase()
+        val parts = Regex("(\\d+)").findAll(name.substringBeforeLast('.')).map { it.value.trimStart('0').ifEmpty { "0" } }.toList()
+        return parts.joinToString("-") { it.padStart(6, '0') } + "#" + name.lowercase()
     }
 
     private fun queryName(ctx: Context, uri: Uri): String? {
@@ -165,18 +185,66 @@ object MediaCourses {
         pack.ch.forEach { c ->
             val m = c.media ?: return@forEach
             val dst = File(dir(ctx, courseId), c.id + "." + ext(m.fname))
-            if (dst.exists()) { done++; return@forEach }
-            runCatching {
-                ctx.contentResolver.openInputStream(Uri.parse(m.uri))?.use { ins ->
-                    dst.outputStream().use { ins.copyTo(it) }
-                }
+            if (dst.isFile && dst.length() > 0L && (m.size <= 0L || dst.length() == m.size)) {
                 done++
+                return@forEach
+            }
+            // 使用同目录临时文件，避免应用中断后留下一个被误判为完整的半截媒体文件。
+            dst.delete()
+            val temp = File(dst.parentFile, dst.name + ".part")
+            temp.delete()
+            val copied = runCatching {
+                val input = ctx.contentResolver.openInputStream(Uri.parse(m.uri))
+                    ?: throw IllegalStateException("无法打开媒体文件")
+                input.use { ins -> temp.outputStream().use { out -> ins.copyTo(out) } }
+                if (!temp.isFile || temp.length() <= 0L) throw IllegalStateException("媒体文件为空")
+                if (!temp.renameTo(dst)) {
+                    temp.copyTo(dst, overwrite = true)
+                    temp.delete()
+                }
+                dst.isFile && dst.length() > 0L
+            }.getOrDefault(false)
+            if (copied) done++ else {
+                temp.delete()
+                dst.delete()
             }
         }
         return done
     }
 
-    fun dir(ctx: Context, courseId: String): File = File(ctx.filesDir, "media/$courseId").apply { mkdirs() }
+    private fun courseFolderId(courseId: String): String {
+        return if (courseId.matches(Regex("[A-Za-z0-9._-]{1,120}")) && courseId != "." && courseId != "..") courseId
+        else "id_" + Base64.encodeToString(courseId.toByteArray(Charsets.UTF_8), Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+    }
+
+    fun dir(ctx: Context, courseId: String): File = File(File(ctx.filesDir, "media"), courseFolderId(courseId)).apply { mkdirs() }
+
+    /** 删除课程时只清理本应用私有副本，不触碰用户原始 SAF 文件。 */
+    fun deleteLocal(ctx: Context, store: Store, courseId: String) {
+        clearLocalCopies(ctx, listOf(courseId), listOfNotNull(store.mediaTrees[courseId]))
+        store.mediaTrees.remove(courseId)
+        val prefix = "$courseId:"
+        store.mediaPos.keys.filter { it.startsWith(prefix) }.toList().forEach { store.mediaPos.remove(it) }
+        store.save()
+    }
+
+
+    fun clearLocalCopies(ctx: Context, courseIds: Collection<String>, treeUris: Collection<String>) {
+        courseIds.forEach { id ->
+            runCatching {
+                val root = File(ctx.filesDir, "media").canonicalFile
+                val target = File(root, courseFolderId(id)).canonicalFile
+                if (target.parentFile == root && target.exists()) target.deleteRecursively()
+            }
+        }
+        treeUris.forEach { raw ->
+            runCatching {
+                val uri = Uri.parse(raw)
+                runCatching { ctx.contentResolver.releasePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                runCatching { ctx.contentResolver.releasePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+            }
+        }
+    }
 
     /** 播放地址：优先应用内副本，其次原始 uri */
     fun resolve(ctx: Context, courseId: String, ch: Chapter): String {
@@ -194,14 +262,19 @@ object MediaCourses {
         val src = resolve(ctx, courseId, ch)
         return runCatching {
             val mmr = android.media.MediaMetadataRetriever()
-            if (src.startsWith("/")) mmr.setDataSource(src) else mmr.setDataSource(ctx, Uri.parse(src))
-            val bmp = mmr.getFrameAtTime(1_000_000L, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-            mmr.release()
-            if (bmp == null) null else {
-                val o = Bitmap.createScaledBitmap(bmp, 360, (360f * bmp.height / bmp.width).toInt().coerceAtLeast(1), true)
-                FileOutputStream(f).use { o.compress(Bitmap.CompressFormat.JPEG, 72, it) }
-                o.recycle(); bmp.recycle()
+            var bmp: Bitmap? = null
+            var scaled: Bitmap? = null
+            try {
+                if (src.startsWith("/")) mmr.setDataSource(src) else mmr.setDataSource(ctx, Uri.parse(src))
+                bmp = mmr.getFrameAtTime(1_000_000L, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                val frame = bmp ?: return@runCatching null
+                scaled = Bitmap.createScaledBitmap(frame, 360, (360f * frame.height / frame.width).toInt().coerceAtLeast(1), true)
+                FileOutputStream(f).use { scaled!!.compress(Bitmap.CompressFormat.JPEG, 72, it) }
                 f
+            } finally {
+                runCatching { mmr.release() }
+                if (scaled !== bmp) runCatching { scaled?.recycle() }
+                runCatching { bmp?.recycle() }
             }
         }.getOrNull()
     }
@@ -217,9 +290,12 @@ object MediaCourses {
                 val src = resolve(ctx, courseId, c)
                 runCatching {
                     val mmr = android.media.MediaMetadataRetriever()
-                    if (src.startsWith("/")) mmr.setDataSource(src) else mmr.setDataSource(ctx, Uri.parse(src))
-                    val d = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                    mmr.release()
+                    val d = try {
+                        if (src.startsWith("/")) mmr.setDataSource(src) else mmr.setDataSource(ctx, Uri.parse(src))
+                        mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                    } finally {
+                        runCatching { mmr.release() }
+                    }
                     if (d > 0) { c.media = m.copy(dur = d / 1000); changed = true }
                 }
             }

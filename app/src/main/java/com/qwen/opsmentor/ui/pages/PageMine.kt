@@ -51,6 +51,7 @@ class PageMine(act: Activity, app: App) : Page(act, app) {
 
     override fun body(host: LinearLayout) {
         val ctx = act
+        if (Tokens.planet) host.setPadding(host.paddingLeft, ctx.dp(40f), host.paddingRight, host.paddingBottom)
         val orbit = iconBtn(ctx, "orbit", "课程管理", 40f) { nav("course-manage") }
         orbit.visibility = if (Tokens.planet) View.VISIBLE else View.GONE
         pageHead(host, "课程", orbit)
@@ -87,6 +88,13 @@ class PageMine(act: Activity, app: App) : Page(act, app) {
                     rerender(false)
                 }
             })
+        }
+        inp.setOnFocusChangeListener { _, focused ->
+            box.background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Tokens.l2)
+                cornerRadius = ctx.dp(14f).toFloat()
+                if (focused) setStroke(ctx.dp(1f), Tokens.accentLine)
+            }
         }
         box.addView(inp, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         val clr = iconBtn(ctx, "close", "清除", 28f) {

@@ -77,7 +77,7 @@ private class TyPreview(private val ty: String, private val color: Int) : androi
  */
 class SelectionBar(private val act: Activity, private val app: App) {
 
-    private var bar: LinearLayout? = null
+    private var bar: HorizontalScrollView? = null
     var target: AnnotatedText? = null
         private set
     private var start = 0
@@ -97,26 +97,34 @@ class SelectionBar(private val act: Activity, private val app: App) {
         start = a; end = max(a + 1, b)
         val ctx = act
         val root = act.findViewById<FrameLayout>(android.R.id.content) ?: return
-        val bar = LinearLayout(ctx).apply {
+        // HTML selbar 在窄屏会自动换行；原生采用可横向滚动的受限容器，
+        // 保证所有调整、线型、颜色和确认按钮都可触达，不再超出屏幕右侧。
+        val row = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            surface(Tokens.l2, 12f, 6f, Tokens.planet)
             setPadding(ctx.dp(6f), ctx.dp(4f), ctx.dp(6f), ctx.dp(4f))
+        }
+        val bar = HorizontalScrollView(ctx).apply {
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isFillViewport = false
+            surface(Tokens.l2, 12f, 6f, Tokens.planet)
+            addView(row, ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ctx.dp(44f)))
         }
         this.bar = bar
         tyViews.clear(); coViews.clear()
 
-        bar.addView(dragHandle(ctx, bar))
-        bar.addView(tiny(ctx, "起−") { shift("s", -1) })
-        bar.addView(tiny(ctx, "起+") { shift("s", 1) })
-        bar.addView(tiny(ctx, "终−") { shift("e", -1) })
-        bar.addView(tiny(ctx, "终+") { shift("e", 1) })
-        bar.addView(tiny(ctx, "整段") {
+        row.addView(dragHandle(ctx, bar))
+        row.addView(tiny(ctx, "起−") { shift("s", -1) })
+        row.addView(tiny(ctx, "起+") { shift("s", 1) })
+        row.addView(tiny(ctx, "终−") { shift("e", -1) })
+        row.addView(tiny(ctx, "终+") { shift("e", 1) })
+        row.addView(tiny(ctx, "整段") {
             val v = target ?: return@tiny
             val r = v.blockRange()
             if (r.last > r.first) { start = r.first; end = r.last; v.setSelection(start, end) }
         })
-        bar.addView(divider(ctx))
+        row.addView(divider(ctx))
         LineType.values().forEach { t ->
             val box = FrameLayout(ctx).apply {
                 flat(Tokens.withAlpha(Tokens.ink, 0.05f), 7f)
@@ -130,10 +138,10 @@ class SelectionBar(private val act: Activity, private val app: App) {
                 background = TyPreview(t.id, Tokens.ink)
             }, FrameLayout.LayoutParams(ctx.dp(22f), ctx.dp(14f)).also { it.gravity = Gravity.CENTER })
             box.setOnClickListener { curTy = t.id; paintSwatches(); box.animatePop() }
-            bar.addView(box)
+            row.addView(box)
             tyViews.add(t.id to box)
         }
-        bar.addView(divider(ctx))
+        row.addView(divider(ctx))
         MarkColor.values().forEach { c ->
             val box = FrameLayout(ctx).apply {
                 flat(Tokens.withAlpha(Tokens.ink, 0.05f), 7f)
@@ -146,14 +154,15 @@ class SelectionBar(private val act: Activity, private val app: App) {
             box.addView(View(ctx).apply { circle(Color.parseColor(c.hex)) },
                 FrameLayout.LayoutParams(ctx.dp(17f), ctx.dp(17f)).also { it.gravity = Gravity.CENTER })
             box.setOnClickListener { curCo = c.id; paintSwatches(); box.animatePop() }
-            bar.addView(box)
+            row.addView(box)
             coViews.add(c.id to box)
         }
-        bar.addView(divider(ctx))
-        bar.addView(tiny(ctx, "划线", strong = true) { commit() })
-        bar.addView(tiny(ctx, "取消") { close() })
+        row.addView(divider(ctx))
+        row.addView(tiny(ctx, "划线", strong = true) { commit() })
+        row.addView(tiny(ctx, "取消") { close() })
 
-        val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ctx.dp(44f))
+        val availableWidth = (root.width.takeIf { it > 0 } ?: ctx.resources.displayMetrics.widthPixels) - ctx.dp(12f)
+        val lp = FrameLayout.LayoutParams(min(ctx.dp(540f), availableWidth.coerceAtLeast(ctx.dp(180f))), ctx.dp(44f))
         lp.gravity = Gravity.TOP or Gravity.START
         root.addView(bar, lp)
         bar.post { place() }
@@ -180,7 +189,7 @@ class SelectionBar(private val act: Activity, private val app: App) {
         val root = act.findViewById<FrameLayout>(android.R.id.content) ?: return
         val loc = IntArray(2); v.getLocationInWindow(loc)
         val scr = IntArray(2); root.getLocationInWindow(scr)
-        val w = if (b.width > 0) b.width.toFloat() else app.dp(300f).toFloat().toFloat().toFloat().toFloat().toFloat().toFloat().toFloat().toFloat().toFloat()
+        val w = if (b.width > 0) b.width.toFloat() else app.dp(300f).toFloat()
         val h = if (b.height > 0) b.height.toFloat() else app.dp(44f).toFloat()
         var x = if (app.store.barX >= 0) app.store.barX else (loc[0] - scr[0]).toFloat()
         var y = if (app.store.barY >= 0) app.store.barY else (loc[1] - scr[1] - h - app.dp(10f))
@@ -237,7 +246,7 @@ class SelectionBar(private val act: Activity, private val app: App) {
 
     // ---------------- 子控件 ----------------
 
-    private fun dragHandle(ctx: Context, bar: LinearLayout): View {
+    private fun dragHandle(ctx: Context, bar: View): View {
         val root = act.findViewById<FrameLayout>(android.R.id.content)
         val h = ImageView(ctx).apply {
             setImageDrawable(Icons.get(ctx, "more", Tokens.sub))
@@ -252,8 +261,12 @@ class SelectionBar(private val act: Activity, private val app: App) {
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (!down || root == null) return@setOnTouchListener false
-                    bar.x = (e.rawX - dx).coerceIn(app.dp(6f).toFloat(), root.width.toFloat() - bar.width.toFloat() - app.dp(6f).toFloat())
-                    bar.y = (e.rawY - dy).coerceIn(app.dp(48f).toFloat(), root.height.toFloat() - bar.height.toFloat() - app.dp(84f).toFloat())
+                    val minX = app.dp(6f).toFloat()
+                    val maxX = max(minX, root.width.toFloat() - bar.width.toFloat() - minX)
+                    val minY = app.dp(48f).toFloat()
+                    val maxY = max(minY, root.height.toFloat() - bar.height.toFloat() - app.dp(84f).toFloat())
+                    bar.x = (e.rawX - dx).coerceIn(minX, maxX)
+                    bar.y = (e.rawY - dy).coerceIn(minY, maxY)
                     app.store.barX = bar.x; app.store.barY = bar.y
                     true
                 }

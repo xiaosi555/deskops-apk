@@ -49,7 +49,11 @@ class PageMarks(act: Activity, app: App) : Page(act, app) {
     private var selected = ""
     private val checked = HashSet<String>()
 
+    override val learning: Boolean
+        get() = (act as? MainActivity)?.isDirectMarksPage() == true
+
     fun inCourse() = selected.isNotEmpty()
+    fun openCourse(courseId: String) { selected = courseId; checked.clear() }
     fun popCourse() { selected = ""; checked.clear() }
 
     override fun body(host: LinearLayout) {
@@ -121,7 +125,7 @@ class PageMarks(act: Activity, app: App) : Page(act, app) {
             }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.marginStart = ctx.dp(8f) })
         host.addView(bar)
-        list.forEach { m -> host.addView(item(m)) }
+        list.forEach { m -> item(m) }
     }
 
     private fun item(m: Mark): View {
@@ -206,6 +210,8 @@ private fun check(ctx: Activity, on: Boolean, onChange: (Boolean) -> Unit): Fram
 class PageMarksCourse(act: Activity, app: App) : Page(act, app) {
 
     override val key = "anno"
+    // HTML STUDY_VIEWS 包含 anno：在本课程划线页阅读和整理也计入学习时间。
+    override val learning = true
     override fun title() = "我的划线"
 
     private var fTy = ""
@@ -287,7 +293,7 @@ class PageMarksCourse(act: Activity, app: App) : Page(act, app) {
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
             return
         }
-        list.forEach { m -> host.addView(row(m)) }
+        list.forEach { m -> row(m) }
     }
 
     private fun row(m: Mark): View {

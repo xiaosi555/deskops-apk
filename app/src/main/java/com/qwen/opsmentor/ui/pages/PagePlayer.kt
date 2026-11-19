@@ -39,6 +39,8 @@ import java.io.File
 class PagePlayer(act: Activity, app: App) : Page(act, app) {
 
     override val key = "player"
+    // HTML 将 player 纳入 STUDY_VIEWS：播放课程时同样累计学习时长。
+    override val learning = true
     override fun title(): String = current()?.t ?: ""
 
     private var player: MediaPlayer? = null
@@ -49,6 +51,16 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     private var playBtn: ImageView? = null
     private var rate = 1f
     private var paused = true
+    // MediaPlayer.prepareAsync 完成前不读取 isPlaying / 不调用 start。
+    private var audioPrepared = false
+    private var pendingAudioStart = false
+    private var videoPrepared = false
+    private var pendingVideoStart = false
+    private var playbackCompleted = false
+    private var playbackError = false
+    private var activeChapterId = ""
+    private var lastPositionSaveAt = 0L
+    private var autoplayOnRender = false
 
     private fun current() = pack.chById(PagePlayer.curCh.ifBlank {
         val b = store.bag()
@@ -60,6 +72,12 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     }
 
     override fun body(host: LinearLayout) {
+        // Page.rerender 会重建整棵视图树；先释放旧 VideoView / MediaPlayer，再创建新控件。
+        stopPlayer()
+        video = null
+        seek = null
+        timeLabel = null
+        playBtn = null
         val ctx = act
         val co = Courses.find(store, store.cur)
         if (co.media.isEmpty()) {
@@ -120,7 +138,11 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
             val r = hrow(ctx)
             r.setPadding(0, ctx.dp(10f), 0, ctx.dp(10f))
             r.isClickable = true
-            r.setOnClickListener { PagePlayer.curCh = c.id; start(c, true) }
+            r.setOnClickListener {
+                PagePlayer.curCh = c.id
+                autoplayOnRender = true
+                rerender(false)
+            }
             val th = FrameLayout(ctx).apply {
                 flat(Tokens.priSoft, ctx.dp(4f).toFloat())
                 layoutParams = LinearLayout.LayoutParams(ctx.dp(52f), ctx.dp(34f))
@@ -144,7 +166,9 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
             listCard.addView(r)
         }
         host.addView(listCard)
-        start(ch, false)
+        val autoplay = autoplayOnRender
+        autoplayOnRender = false
+        start(ch, autoplay)
     }
 
 
@@ -167,9 +191,23 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                 val item = MediaCourses.fromUris(ctx, uris, kind).firstOrNull() ?: return@pickMedia
                 val ch = current() ?: return@pickMedia
                 ch.media = com.qwen.opsmentor.data.MediaRef(kind, item.name, item.uri.toString(), item.size, ch.media?.dur ?: 0)
-                val uc = store.userCourses.firstOrNull { it.id == store.cur }
+                val courseId = store.cur
+                val uc = store.userCourses.firstOrNull { it.id == courseId }
                 uc?.let { it.packJson = pack.toJson().toString() }
-                store.save(); app.packs.put(store.cur, pack); rerender(true)
+                store.save()
+                app.packs.put(courseId, pack)
+                rerender(true)
+                if (store.mediaKeep) {
+                    Thread {
+                        val copied = MediaCourses.copyInto(ctx, app, courseId)
+                        handler.post {
+                            Sheets.toast(ctx, if (copied > 0) "文件已重新连接并保存到应用内" else "文件已连接，但内部复制失败；请检查存储空间")
+                            MediaCourses.probeDuration(ctx, app, courseId) {}
+                        }
+                    }.start()
+                } else {
+                    MediaCourses.probeDuration(ctx, app, courseId) {}
+                }
             }
         }
         box.addView(re, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = ctx.dp(8f) })
@@ -179,8 +217,10 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     private fun playable(ch: com.qwen.opsmentor.data.Chapter): Boolean {
         if (ch.media == null) return false
         val path = MediaCourses.resolve(act, store.cur, ch)
-        return if (path.startsWith("/")) File(path).exists() else runCatching {
-            act.contentResolver.openInputStream(Uri.parse(path))?.close()
+        return if (path.startsWith("/")) File(path).isFile && File(path).canRead() else runCatching {
+            val input = act.contentResolver.openInputStream(Uri.parse(path))
+                ?: throw IllegalStateException("媒体 URI 无法打开")
+            input.use { }
             true
         }.getOrDefault(false)
     }
@@ -190,41 +230,101 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         stopPlayer()
         app.reader?.stop()
         val src = MediaCourses.resolve(act, store.cur, ch)
-        if (src.isEmpty()) { Sheets.toast(ctx, "还没有连接文件"); rerender(false); return }
+        if (src.isEmpty()) { Sheets.toast(ctx, "还没有连接文件"); return }
+        activeChapterId = ch.id
+        lastPositionSaveAt = android.os.SystemClock.elapsedRealtime()
+        playbackCompleted = false
+        playbackError = false
+        pendingAudioStart = autoplay
         val uri = if (src.startsWith("/")) Uri.fromFile(File(src)) else Uri.parse(src)
         val co = Courses.find(store, store.cur)
         if (co.media == "video") {
             video?.apply {
-                setVideoURI(uri)
+                videoPrepared = false
+                pendingVideoStart = autoplay
                 setOnPreparedListener { mp ->
+                    videoPrepared = true
                     mp.isLooping = false
-                    setRate()
-                    if (autoplay) start()
+                    preparedVideoPlayer = mp
+                    applyRate(mp)
                     restorePos(ch)
-                    ticker?.let { postTick() }
+                    val shouldStart = pendingVideoStart
+                    pendingVideoStart = false
+                    paused = !shouldStart
+                    if (shouldStart) start()
+                    paintPlay()
+                    postTick()
                 }
-                setOnErrorListener { _, _, _ -> Sheets.toast(ctx, "这个格式在当前设备上播放失败，建议用 mp4"); true }
-                start()
+                setOnCompletionListener {
+                    pendingVideoStart = false
+                    paused = true
+                    playbackCompleted = true
+                    saveCompletedPosition()
+                    paintPlay()
+                }
+                setOnErrorListener { _, _, _ ->
+                    videoPrepared = false
+                    pendingVideoStart = false
+                    playbackError = true
+                    paused = true
+                    ticker?.let { handler.removeCallbacks(it) }
+                    ticker = null
+                    paintPlay()
+                    Sheets.toast(ctx, "这个格式在当前设备上播放失败，建议用 mp4")
+                    true
+                }
+                setVideoURI(uri)
             }
         } else {
             player = MediaPlayer().apply {
                 runCatching {
                     setDataSource(act, uri)
-                    setOnPreparedListener {
-                        setRate()
-                        if (autoplay) start()
-                        restorePos(ch); paused = false; paintPlay(); postTick()
+                    setOnPreparedListener { mp ->
+                        audioPrepared = true
+                        applyRate(mp)
+                        restorePos(ch)
+                        val shouldStart = pendingAudioStart
+                        pendingAudioStart = false
+                        paused = !shouldStart
+                        if (shouldStart) runCatching { mp.start() }
+                            .onFailure { paused = true; Sheets.toast(ctx, "音频启动失败") }
+                        paintPlay()
+                        postTick()
                     }
-                    setOnErrorListener { _, _, _ -> Sheets.toast(ctx, "这个格式在当前设备上播放失败，建议用 mp3 / m4a"); true }
+                    setOnCompletionListener {
+                        paused = true
+                        pendingAudioStart = false
+                        playbackCompleted = true
+                        saveCompletedPosition()
+                        paintPlay()
+                    }
+                    setOnErrorListener { mp, _, _ ->
+                        audioPrepared = false
+                        pendingAudioStart = false
+                        playbackError = true
+                        paused = true
+                        ticker?.let { handler.removeCallbacks(it) }
+                        ticker = null
+                        runCatching { mp.reset(); mp.release() }
+                        if (player === mp) player = null
+                        paintPlay()
+                        Sheets.toast(ctx, "这个格式在当前设备上播放失败，建议用 mp3 / m4a")
+                        true
+                    }
                     prepareAsync()
-                }.onFailure { Sheets.toast(ctx, "无法读取该文件") }
+                }.onFailure {
+                    audioPrepared = false
+                    pendingAudioStart = false
+                    runCatching { player?.release() }
+                    player = null
+                    Sheets.toast(ctx, "无法读取该文件")
+                }
             }
         }
         if (autoplay) {
             store.bag().pin = ch.id
             store.save()
         }
-        rerender(false)
     }
 
     private fun duration(): Int = try {
@@ -245,11 +345,56 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
 
     private fun toggle() {
         val ch = current() ?: return
+        if (playbackError) { start(ch, true); return }
         val v = video
+        if (playbackCompleted || (duration() > 0 && position() >= duration())) {
+            store.mediaPos["${store.cur}:${ch.id}"] = 0L
+            store.save()
+            playbackCompleted = false
+            runCatching {
+                if (v != null) {
+                    v.seekTo(0)
+                    v.start()
+                } else {
+                    val p = player ?: throw IllegalStateException("播放器已释放")
+                    if (!audioPrepared) throw IllegalStateException("音频尚未准备完成")
+                    p.seekTo(0)
+                    p.start()
+                }
+                paused = false
+                postTick()
+            }.onFailure {
+                paused = true
+                Sheets.toast(act, "无法重新播放，请重新打开本集")
+            }
+            paintPlay()
+            return
+        }
         if (v != null) {
-            if (v.isPlaying) { v.pause(); paused = true } else { v.start(); paused = false }
+            if (v.isPlaying) {
+                v.pause(); paused = true
+                pendingVideoStart = false
+            } else if (!videoPrepared) {
+                pendingVideoStart = !pendingVideoStart
+                paused = !pendingVideoStart
+                if (pendingVideoStart) v.start() else v.pause()
+            } else {
+                v.start(); paused = false
+            }
         } else player?.let { p ->
-            if (p.isPlaying) { p.pause(); paused = true } else { p.start(); paused = false }
+            if (!audioPrepared) {
+                // 加载中再次点击可撤销待播放状态；不会触碰未准备完成的 MediaPlayer。
+                pendingAudioStart = !pendingAudioStart
+                paused = !pendingAudioStart
+            } else {
+                runCatching {
+                    if (p.isPlaying) { p.pause(); paused = true }
+                    else { p.start(); paused = false }
+                }.onFailure {
+                    paused = true
+                    Sheets.toast(act, "音频暂时无法播放，请重新尝试")
+                }
+            }
         } ?: run { start(ch, true); return }
         paintPlay()
     }
@@ -263,29 +408,41 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         if (idx < 0) return
         val next = (idx + d).coerceIn(0, pack.ch.size - 1)
         PagePlayer.curCh = pack.ch[next].id
-        start(pack.ch[next], true)
+        autoplayOnRender = true
+        rerender(false)
+    }
+
+    private var preparedVideoPlayer: MediaPlayer? = null
+
+    private fun applyRate(target: MediaPlayer) {
+        runCatching { target.playbackParams = target.playbackParams.setSpeed(rate) }
     }
 
     private fun setRate() {
-        try {
-            player?.playbackParams = player!!.playbackParams.setSpeed(rate)
-        } catch (e: Exception) {
-        }
+        preparedVideoPlayer?.let { applyRate(it) }
+        player?.let { applyRate(it) }
     }
 
     private fun rateSheet() {
         Sheets.picker(act, "播放速度", listOf(
-            Opt("0.75", "0.75×"), Opt("1", "1×（默认）"), Opt("1.25", "1.25×"), Opt("1.5", "1.5×"), Opt("2", "2×"),
+            Opt("0.5", "0.5×"), Opt("0.75", "0.75×"), Opt("1", "1×（默认）"),
+            Opt("1.25", "1.25×"), Opt("1.5", "1.5×"), Opt("1.75", "1.75×"),
+            Opt("2", "2×"), Opt("2.5", "2.5×"), Opt("3", "3×"),
         ), rate.toString()) { v, _ ->
             rate = v.toFloatOrNull() ?: 1f
             setRate()
-            rerender(false)
         }
     }
 
     private fun restorePos(ch: com.qwen.opsmentor.data.Chapter) {
-        val ms = (store.mediaPos["${store.cur}:${ch.id}"] ?: 0L).toInt()
-        if (ms > 0) runCatching { seekTo(ms) }
+        val key = "${store.cur}:${ch.id}"
+        val ms = (store.mediaPos[key] ?: 0L).coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val d = duration()
+        // 已经播放完的章节再次打开时从头开始，而不是停留在结尾无法启动。
+        if (d > 0 && ms >= d - 500) {
+            store.mediaPos[key] = 0L
+            store.save()
+        } else if (ms > 0) runCatching { seekTo(ms) }
     }
 
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -299,13 +456,40 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                 if (d > 0) {
                     seek?.progress = (p * 1000L / d).toInt()
                     timeLabel?.text = "${fmt(p)} / ${fmt(d)}"
-                    val ch = current()
-                    if (ch != null) store.mediaPos["${store.cur}:${ch.id}"] = p.toLong()
+                    val playing = isPlaying()
+                    if (playing) app.timer.poke(store)
+                    val chapterId = activeChapterId
+                    if (chapterId.isNotEmpty()) {
+                        store.mediaPos["${store.cur}:${chapterId}"] = p.toLong()
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (now - lastPositionSaveAt >= 5000L) {
+                            lastPositionSaveAt = now
+                            store.save()
+                        }
+                    }
+                    // 播放结束后保存最终位置并停止轮询，避免完成状态下永久空转。
+                    if (playbackCompleted || (!playing && p >= d)) {
+                        if (chapterId.isNotEmpty()) store.mediaPos["${store.cur}:${chapterId}"] = d.toLong()
+                        store.save()
+                        ticker = null
+                        return
+                    }
                 }
                 handler.postDelayed(this, 500)
             }
         }
         ticker?.let { handler.post(it) }
+    }
+
+    private fun saveCompletedPosition() {
+        val chapterId = activeChapterId
+        val d = duration()
+        if (chapterId.isNotEmpty() && d > 0) {
+            store.mediaPos["${store.cur}:${chapterId}"] = d.toLong()
+            store.save()
+        }
+        ticker?.let { handler.removeCallbacks(it) }
+        ticker = null
     }
 
     private fun fmt(ms: Int): String {
@@ -314,13 +498,27 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     }
 
     private fun stopPlayer() {
-        runCatching { video?.stopPlayback() }
-        runCatching {
-            player?.stop()
-            player?.release()
+        // 离开页面/切换章节前保留最后播放位置。
+        if (activeChapterId.isNotEmpty()) {
+            val p = position()
+            if (p > 0) store.mediaPos["${store.cur}:${activeChapterId}"] = p.toLong()
         }
+        runCatching { video?.stopPlayback() }
+        runCatching { if (audioPrepared) player?.stop() }
+        runCatching { player?.release() }
         player = null
+        audioPrepared = false
+        pendingAudioStart = false
+        videoPrepared = false
+        pendingVideoStart = false
+        playbackCompleted = false
+        playbackError = false
+        preparedVideoPlayer = null
+        paused = true
+        activeChapterId = ""
         ticker?.let { handler.removeCallbacks(it) }
+        ticker = null
+        runCatching { store.save() }
     }
 
     /** 供外部查询：页面是否正在播放 */

@@ -1,61 +1,94 @@
 package com.qwen.opsmentor.core
 
+import android.os.Handler
+import android.os.Looper
 import com.qwen.opsmentor.App
 import com.qwen.opsmentor.state.Store
 
 /**
- * 学习时长计时（对应 Web「学习时长」补丁）：
- * 只在被判定为学习页、页面可见且有操作时累计；2 分钟无操作暂停；离开页面立即落盘。
+ * 学习时长计时：仅学习页面可见且最近 120 秒内有用户操作时累计。
+ * 与 HTML 的 5 秒 tick / 2 分钟空闲暂停行为一致。
  */
 class StudyTimer {
-    private var acc = 0L            // 当日累计毫秒
+    private val handler = Handler(Looper.getMainLooper())
+    private var acc = 0L
     private var lastTick = 0L
+    private var lastActivityAt = 0L
     private var active = false
     private var pageKey = ""
 
+    private val ticker = object : Runnable {
+        override fun run() {
+            if (!active) return
+            val now = System.currentTimeMillis()
+            if (lastActivityAt > 0L && now - lastActivityAt <= 120_000L) {
+                acc += (now - lastTick).coerceIn(0L, 7_000L)
+                flushWholeMinutes(App.inst.store)
+            }
+            lastTick = now
+            handler.postDelayed(this, 5_000L)
+        }
+    }
+
     fun onPage(key: String, learning: Boolean) {
-        flush()
+        // 在两个学习页面之间切换时保留不足一分钟的余量，不因导航而丢失。
+        if (!learning) flush()
+        handler.removeCallbacks(ticker)
+        val sameLearningPage = learning && pageKey == key
+        val wasActive = active
         pageKey = if (learning) key else ""
         active = learning
-        lastTick = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        if (!sameLearningPage || !wasActive) lastTick = now
+        // 同一页面的重绘 / 从后台恢复不等于用户活动；只有首次进入或切换学习页才刷新空闲计时。
+        if (!learning) lastActivityAt = 0L
+        else if (!sameLearningPage) lastActivityAt = now
+        if (active) handler.postDelayed(ticker, 5_000L)
     }
 
     fun onPause() {
-        flush(); active = false
+        flush()
+        active = false
+        lastActivityAt = 0L
+        handler.removeCallbacks(ticker)
     }
 
     fun onResume() {
         if (pageKey.isNotEmpty()) {
-            active = true; lastTick = System.currentTimeMillis()
+            active = true
+            lastTick = System.currentTimeMillis()
+            // 恢复前台后等待一次真实交互，再开始计算，避免后台停留时间计入。
+            lastActivityAt = 0L
+            handler.removeCallbacks(ticker)
+            handler.postDelayed(ticker, 5_000L)
         }
     }
 
-    /** 用户有操作时调用：把上次 tick 到现在的时间计入（超过 120 秒的空档不计） */
+    /** 任意点击、滚动、按键等用户交互都会刷新空闲计时。 */
     fun poke(store: Store) {
         if (!active) return
-        val now = System.currentTimeMillis()
-        val d = now - lastTick
-        if (d in 1..120_000L) {
-            acc += d
-            if (acc >= 30_000L) {
-                addMinutes(store, (acc / 60_000L).toInt())
-                acc = acc % 60_000L
-            }
-        }
-        lastTick = now
+        lastActivityAt = System.currentTimeMillis()
+    }
+
+    private fun flushWholeMinutes(store: Store) {
+        if (acc < 60_000L) return
+        val minutes = (acc / 60_000L).toInt()
+        acc %= 60_000L
+        addMinutes(store, minutes)
     }
 
     private fun flush() {
-        if (acc > 0) {
-            addMinutes(App.inst.store, (acc / 60_000L).toInt())
-            acc = 0
+        if (acc > 0L) {
+            val minutes = Math.round(acc / 60_000f).toInt()
+            addMinutes(App.inst.store, minutes)
+            acc = 0L
         }
     }
 
     private fun addMinutes(store: Store, min: Int) {
         if (min <= 0) return
-        val k = Store.today()
-        store.studyLog[k] = (store.studyLog[k] ?: 0) + min
+        val key = Store.today()
+        store.studyLog[key] = (store.studyLog[key] ?: 0) + min
         store.save()
     }
 }

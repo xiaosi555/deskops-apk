@@ -67,6 +67,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     private val pages = HashMap<String, Page>()
     private var view = "mine"
     private val navStack = ArrayList<String>()
+    // HTML 中 anno 是「我的划线」的课程直达入口；返回时需同时退出课程筛选层。
+    private var marksDirect = false
     private var topPad = 0
     private var bottomPad = 0
 
@@ -167,7 +169,20 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     }
 
     /** 顶栏 / 页面外部刷新入口（供设置页等直接调用） */
-    fun refresh() = render()
+    fun refresh() {
+        val bars = ViewCompat.getRootWindowInsets(root)?.getInsets(WindowInsetsCompat.Type.systemBars())
+        if (bars != null) {
+            topPad = if (app.store.topInset) bars.top else 0
+            bottomPad = bars.bottom
+            appbar.setPadding(0, topPad, 0, 0)
+        } else if (!app.store.topInset) {
+            topPad = 0
+            appbar.setPadding(0, 0, 0, 0)
+        }
+        deco.update(decoKey(), dp(150f) + topPad)
+        layoutStage()
+        render()
+    }
 
     fun pickImage(size: Int, cb: (String) -> Unit) {
         pendingPick = size to cb
@@ -206,8 +221,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         root = FrameLayout(this)
-        deco = DecoView(this, decoKey(), dp(240f))
-        root.addView(deco, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(240f)))
+        deco = DecoView(this, decoKey(), dp(150f))
+        root.addView(deco, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(150f)))
         stage = FrameLayout(this)
         root.addView(stage, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
@@ -244,11 +259,19 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         })
 
         setContentView(root)
+        root.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+                syncContentWidths()
+                layoutStage()
+            }
+        }
         installSystemBackHandler()
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             topPad = if (app.store.topInset) bars.top else 0
             bottomPad = bars.bottom
+            deco.update(decoKey(), dp(150f) + topPad)
+            pages.values.forEach { it.updateContentInsets() }
             appbar.setPadding(0, topPad, 0, 0)
             tabbar.setPadding(0, 0, 0, bottomPad)
             (mini.layoutParams as? FrameLayout.LayoutParams)?.bottomMargin = dp(60f) + bottomPad
@@ -271,7 +294,11 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     private fun currentCourse() = Courses.find(app.store, app.store.cur)
 
     /** HTML .app / .stage 的 640px 最大内容宽度，手机全宽、平板居中。 */
-    private fun contentWidth(): Int = minOf(resources.displayMetrics.widthPixels, dp(640f))
+    private fun contentWidth(): Int {
+        // 优先使用当前 Activity 窗口的实测宽度，避免分屏/自由窗口仍按整块屏幕计算。
+        val available = root.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        return minOf(available, dp(640f))
+    }
 
     /** 旋转屏幕 / 窗口尺寸变化后，保持 HTML 640px 应用画布居中。 */
     private fun syncContentWidths() {
@@ -303,7 +330,8 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         val lp = stage.layoutParams as FrameLayout.LayoutParams
         lp.width = contentWidth()
         lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-        lp.topMargin = if (onTab) 0 else topPad + dp(56f)
+        // HTML：无顶栏的 Tab 页面仍需避开状态栏；子页面在安全区之后再预留 56dp 顶栏。
+        lp.topMargin = topPad + if (onTab) 0 else dp(56f)
         lp.bottomMargin = dp(60f) + bottomPad
         stage.layoutParams = lp
     }
@@ -315,23 +343,43 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     }
 
     fun nav(v: String) {
-        if (v in listOf("today", "know", "review", "prog", "play") && pack().ch.isEmpty()) {
+        val target = if (v == "anno") {
+            marksDirect = true
+            val marksPage = pages.getOrPut("my-marks") { PageMarks(this, app) } as PageMarks
+            marksPage.openCourse(app.store.cur)
+            "my-marks"
+        } else {
+            if (v == "my-marks") marksDirect = false
+            v
+        }
+        if (target in listOf("today", "know", "review", "prog", "play") && pack().ch.isEmpty()) {
             Sheets.toast(this, "这门课程还没有章节内容，可通过「课程 → 导入」补充")
             return
         }
-        if (v == view) { render(); return }
-        if (view == "player" && v != "player") leavePlayer()
+        if (target == view) { render(); return }
+        if (view == "player" && target != "player") leavePlayer()
         selectionBar.close()
-        app.reader?.let { if (it.on && v != "today") it.stop() }
-        if (tabs.containsKey(v)) navStack.clear() else navStack.add(view)
-        view = v
+        app.reader?.let { if (it.on && target != "today") it.stop() }
+        if (tabs.containsKey(target)) navStack.clear() else navStack.add(view)
+        view = target
         render()
     }
 
     fun goBack() {
         if (selectionBar.isOpen()) { selectionBar.close(); return }
-        (pages["my-marks"] as? PageMarks)?.let { if (it.inCourse()) { it.popCourse(); render(); return } }
-        (pages["io"] as? PageIo)?.let { if (it.inDetail()) { it.popDetail(); render(); return } }
+        // 只处理当前页面的嵌套状态；缓存的隐藏页面不能拦截当前路由返回。
+        if (view == "my-marks") {
+            (pages["my-marks"] as? PageMarks)?.let {
+                if (it.inCourse()) {
+                    it.popCourse()
+                    if (!marksDirect) { render(); return }
+                    marksDirect = false
+                }
+            }
+        }
+        if (view == "io") {
+            (pages["io"] as? PageIo)?.let { if (it.inDetail()) { it.popDetail(); render(); return } }
+        }
         selectionBar.close()
         val next = if (navStack.isNotEmpty()) navStack.removeAt(navStack.size - 1) else "mine"
         if (view == "player" && next != "player") leavePlayer()
@@ -342,6 +390,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
     }
 
     fun currentView(): String = view
+    fun isDirectMarksPage(): Boolean = view == "my-marks" && marksDirect
     fun stackBase(): String = navStack.firstOrNull() ?: "mine"
     fun pack() = app.currentPack()
 
@@ -428,7 +477,7 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
             isAppearanceLightStatusBars = !Tokens.dark
             isAppearanceLightNavigationBars = !Tokens.dark
         }
-        deco.update(decoKey(), dp(240f))
+        deco.update(decoKey(), dp(150f) + topPad)
 
         val onTab = tabs.containsKey(view)
         val page = pages.getOrPut(view) { make(view) }
@@ -559,6 +608,11 @@ class MainActivity : AppCompatActivity(), ScrollOwner {
         app.timer.onResume()
         mini.reappearOnResume()
         render()
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        if (::app.isInitialized) app.timer.poke(app.store)
     }
 
     override fun onPause() {

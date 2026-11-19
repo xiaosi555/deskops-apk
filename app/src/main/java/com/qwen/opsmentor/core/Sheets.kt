@@ -16,6 +16,9 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import androidx.core.widget.NestedScrollView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.qwen.opsmentor.state.LineType
 import com.qwen.opsmentor.state.MarkColor
 import java.text.SimpleDateFormat
@@ -45,7 +48,13 @@ object Sheets {
         val d = Dialog(ctx)
         d.requestWindowFeature(Window.FEATURE_NO_TITLE)
         d.window?.apply {
-            if (transparent) setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
+            if (transparent) {
+                setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
+                WindowCompat.setDecorFitsSystemWindows(this, false)
+                statusBarColor = android.graphics.Color.TRANSPARENT
+                navigationBarColor = android.graphics.Color.TRANSPARENT
+                addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+            }
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             if (!transparent) addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
@@ -139,12 +148,28 @@ object Sheets {
         hd.addView(iconBtn(ctx, "close", "关闭", 34f) { d.dismiss() })
         hd.setPadding(ctx.dp(16f), ctx.dp(10f), ctx.dp(12f), ctx.dp(6f))
         sh.addView(hd)
-        val scroll = NestedScrollView(ctx).apply {
+        // HTML Sheet：主体自然撑开，超过 90% 屏高后只滚动内容区；不能用 0dp+weight
+        // 配合 WRAP_CONTENT 父容器，否则父容器没有剩余高度时会把整个正文压成 0 高。
+        val screenHeight = ctx.resources.displayMetrics.heightPixels
+        val maxSheetHeight = (screenHeight * 0.90f).toInt()
+        val reserved = ctx.dp(64f) + if (onSave != null) ctx.dp(72f) else insetBottom(ctx)
+        val htmlBodyCap = (maxSheetHeight - reserved).coerceAtLeast(ctx.dp(120f))
+        val bodyCap = if (maxHeightPx > 0) minOf(maxHeightPx, htmlBodyCap) else htmlBodyCap
+        val scroll = object : NestedScrollView(ctx) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                val parentCap = if (View.MeasureSpec.getMode(heightMeasureSpec) == View.MeasureSpec.UNSPECIFIED) {
+                    bodyCap
+                } else {
+                    minOf(bodyCap, View.MeasureSpec.getSize(heightMeasureSpec))
+                }
+                val cappedHeight = View.MeasureSpec.makeMeasureSpec(parentCap, View.MeasureSpec.AT_MOST)
+                super.onMeasure(widthMeasureSpec, cappedHeight)
+            }
+        }.apply {
             isVerticalScrollBarEnabled = false
             addView(body, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            if (maxHeightPx > 0) layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx)
         }
-        sh.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, if (maxHeightPx > 0) ViewGroup.LayoutParams.WRAP_CONTENT else 0, 1f))
+        sh.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         if (onSave != null) {
             val ft = hrow(ctx)
             ft.setPadding(ctx.dp(14f), ctx.dp(10f), ctx.dp(14f), ctx.dp(14f) + insetBottom(ctx))
@@ -160,6 +185,13 @@ object Sheets {
         } else {
             sh.addView(View(ctx), LinearLayout.LayoutParams(1, insetBottom(ctx)))
         }
+        // 全屏 Dialog 的内容本身覆盖整屏，setCanceledOnTouchOutside 无法识别遮罩点击，
+        // 因此由遮罩容器显式关闭，Sheet 本体拦截空白区域点击。
+        wrap.setBackgroundColor(Tokens.scrim)
+        wrap.isClickable = true
+        wrap.setOnClickListener { d.dismiss() }
+        sh.isClickable = true
+        sh.setOnClickListener { /* consume backdrop click only inside the sheet */ }
         val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         lp.gravity = Gravity.BOTTOM
         wrap.addView(sh, lp)
@@ -170,7 +202,11 @@ object Sheets {
         return d
     }
 
-    private fun insetBottom(ctx: Context): Int = 0
+    private fun insetBottom(ctx: Context): Int {
+        val activity = ctx as? android.app.Activity ?: return 0
+        val insets = ViewCompat.getRootWindowInsets(activity.window.decorView) ?: return 0
+        return insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+    }
 
     /** 表单字段：label + 控件 */
     fun field(ctx: Context, labelText: String, control: View): LinearLayout = LinearLayout(ctx).apply {
@@ -204,6 +240,7 @@ object Sheets {
     // ---------------- 选项弹层 Picker ----------------
 
     fun picker(ctx: Context, title: String, items: List<Opt>, value: String?, onPick: (String, String) -> Unit) {
+        var pickerDialog: Dialog? = null
         val list = vcol(ctx, padH = 0, padV = 0)
         items.forEach { o ->
             if (o.group.isNotEmpty()) {
@@ -215,13 +252,17 @@ object Sheets {
             val row = hrow(ctx)
             row.setPadding(ctx.dp(16f), 0, ctx.dp(16f), 0)
             val on = o.value == value
-            row.addView(iconBtn(ctx, o.icon.ifEmpty { if (on) "check" else "dot" }, o.title, 30f,
-                if (o.danger) Tokens.bad else (if (on) Tokens.pri else Tokens.sub)) {})
+            val iconBox = FrameLayout(ctx)
+            iconBox.addView(iconView(ctx, o.icon.ifEmpty { if (on) "check" else "dot" },
+                if (o.danger) Tokens.bad else (if (on) Tokens.pri else Tokens.sub), 18f),
+                FrameLayout.LayoutParams(ctx.dp(18f), ctx.dp(18f)).also { it.gravity = Gravity.CENTER })
+            row.addView(iconBox, LinearLayout.LayoutParams(ctx.dp(30f), ctx.dp(30f)))
             val copy = vcol(ctx)
             copy.addView(label(ctx, o.title, 15f, if (o.danger) Tokens.bad else Tokens.ink, Tokens.weightM()))
             if (o.sub.isNotEmpty()) copy.add(muted(ctx, o.sub, 12f), t = 2)
             row.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.leftMargin = ctx.dp(10f) })
-            if (on) row.addView(iconBtn(ctx, "checkTick", "", 22f, Tokens.pri) {})
+            if (on) row.addView(iconView(ctx, "checkTick", Tokens.pri, 18f),
+                LinearLayout.LayoutParams(ctx.dp(22f), ctx.dp(22f)))
             row.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(56f))
             val wrap = FrameLayout(ctx)
             val div = View(ctx).apply { flat(Tokens.hairc, 1f) }
@@ -229,20 +270,12 @@ object Sheets {
             list.addView(wrap, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(56f)))
             row.isClickable = true
             row.setOnClickListener {
-                Sheets.findDialog(row)?.dismiss()
+                pickerDialog?.dismiss()
                 onPick(o.value, o.title)
             }
+            row.installHtmlPressFeedback()
         }
-        sheet(ctx, title, list, null)
-    }
-
-    private fun findDialog(v: View): Dialog? {
-        var p = v.parent
-        while (p != null) {
-            if (p is Dialog) return p
-            p = (p as? View)?.parent
-        }
-        return null
+        pickerDialog = sheet(ctx, title, list, null)
     }
 
     // ---------------- 确认 / 输入 ----------------
@@ -264,6 +297,11 @@ object Sheets {
         ft.getChildAt(0).setOnClickListener { d.dismiss() }
         ft.getChildAt(1).setOnClickListener { d.dismiss(); onOk() }
         val wrap = FrameLayout(ctx)
+        wrap.setBackgroundColor(Tokens.scrim)
+        wrap.isClickable = true
+        wrap.setOnClickListener { d.dismiss() }
+        box.isClickable = true
+        box.setOnClickListener { /* consume backdrop click only inside dialog */ }
         val lp = FrameLayout.LayoutParams(ctx.dp(320f), ViewGroup.LayoutParams.WRAP_CONTENT)
         lp.gravity = Gravity.CENTER
         wrap.addView(box, lp)
@@ -287,6 +325,11 @@ object Sheets {
         col.addView(ft)
         val d = dialog(ctx)
         val wrap = FrameLayout(ctx)
+        wrap.setBackgroundColor(Tokens.scrim)
+        wrap.isClickable = true
+        wrap.setOnClickListener { d.dismiss() }
+        col.isClickable = true
+        col.setOnClickListener { /* consume backdrop click only inside dialog */ }
         val lp = FrameLayout.LayoutParams(ctx.dp(320f), ViewGroup.LayoutParams.WRAP_CONTENT)
         lp.gravity = Gravity.CENTER
         wrap.addView(col, lp)
@@ -371,6 +414,11 @@ object Sheets {
         sheet.add(noteBox(ctx, "这里只是预览：点「保存到本机」才会生成文件，直接关闭不会触发任何下载。", hint), t = 0)
         ((sheet.getChildAt(sheet.childCount - 1).layoutParams) as? LinearLayout.LayoutParams)?.setMargins(ctx.dp(16f), ctx.dp(6f), ctx.dp(16f), ctx.dp(16f))
         val wrap = FrameLayout(ctx)
+        wrap.setBackgroundColor(Tokens.scrim)
+        wrap.isClickable = true
+        wrap.setOnClickListener { d.dismiss() }
+        sheet.isClickable = true
+        sheet.setOnClickListener { /* consume backdrop click only inside export preview */ }
         val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(520f))
         lp.gravity = Gravity.CENTER
         wrap.addView(sheet, lp)

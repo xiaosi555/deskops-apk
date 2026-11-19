@@ -1,4 +1,7 @@
 package com.qwen.opsmentor.io
+
+import android.content.Context
+import com.qwen.opsmentor.media.MediaCourses
 import com.qwen.opsmentor.data.toJson
 
 import com.qwen.opsmentor.data.Chapter
@@ -42,10 +45,25 @@ object Importer {
     fun parse(raw: String, fileName: String = ""): Parsed {
         val t = raw.trim()
         if (t.isEmpty()) return Parsed(JSONObject(), "内容为空", fileName = fileName)
+        // 完整 Markdown 档案含可恢复数据块；优先读取该块，避免解析时丢失状态与个人设置。
+        val embedded = Regex("(?s)````opsmentor-json\\s*(.*?)\\s*````").find(t)
+        if (embedded != null) {
+            val archive = try { JSONObject(embedded.groupValues[1]) } catch (e: Exception) {
+                return Parsed(JSONObject(), "Markdown 档案数据块损坏", fileName = fileName)
+            }
+            return fromArchive(archive, fileName)
+        }
         if (t.startsWith("{") || t.startsWith("[")) {
             val o = try {
-                val x = JSONObject(t)
-                if (x.has("courses") || x.has("app")) x else if (x.length() == 1 && x.optJSONArray("array") != null) JSONObject().put("courses", x.getJSONArray("array")) else JSONObject().put("courses", JSONArray(listOf(x)))
+                if (t.startsWith("[")) {
+                    // 支持直接导入课程对象数组，不要把 JSON 数组误交给 JSONObject 解析。
+                    JSONObject().put("courses", JSONArray(t))
+                } else {
+                    val x = JSONObject(t)
+                    if (x.has("courses") || x.has("app")) x
+                    else if (x.length() == 1 && x.optJSONArray("array") != null) JSONObject().put("courses", x.getJSONArray("array"))
+                    else JSONObject().put("courses", JSONArray().put(x))
+                }
             } catch (e: Exception) {
                 return Parsed(JSONObject(), "JSON 格式不正确：${e.message?.take(40) ?: "无法解析"}", fileName = fileName)
             }
@@ -91,10 +109,30 @@ object Importer {
     }
 
     /** 应用档案：merge 合并 / replace 覆盖 */
-    fun apply(store: Store, packs: PackRegistry, o: JSONObject, mode: String): ApplyResult {
+    fun apply(ctx: Context, store: Store, packs: PackRegistry, o: JSONObject, mode: String): ApplyResult {
         val out = ApplyResult()
         val courses = o.optJSONArray("courses") ?: return out
         val scope = o.optString("scope", "all")
+        if (mode == "replace" && scope == "all") {
+            // 完整档案覆盖 = 替换整套课程集合与学习状态，而不只是覆盖同 ID 的课程。
+            val oldCourseIds = (store.userCourses.map { it.id } + store.mediaTrees.keys).distinct()
+            val oldTreeUris = store.mediaTrees.values.toList()
+            MediaCourses.clearLocalCopies(ctx, oldCourseIds, oldTreeUris)
+            store.userCourses.forEach { packs.evict(it.id) }
+            store.userCourses.clear()
+            store.bags.clear()
+            store.co.clear()
+            store.mediaTrees.clear() // SAF 授权属于当前设备，不可从另一设备的档案恢复
+            // 无论旧档案是否包含个人设置块，覆盖导入都必须清空旧课程关联状态；
+            // 若档案含 personal/ui，后续 applyUi 会再恢复其中保存的数据。
+            store.star.clear()
+            store.deletedCourses.clear()
+            store.readPos.clear()
+            store.studyLog.clear()
+            store.mediaPos.clear()
+            store.shortcuts.clear()
+            store.setCur(courses.optJSONObject(0)?.optString("id").orEmpty().ifBlank { Store.COURSE_OPS })
+        }
         for (i in 0 until courses.length()) {
             val c = courses.optJSONObject(i) ?: continue
             val title = c.optString("title").trim()
@@ -103,6 +141,8 @@ object Importer {
             val isBuiltin = Courses.builtin.any { it.id == id0 } && id0 != ""
             val id = when {
                 isBuiltin && (scope == "all" || scope == "course") -> id0
+                mode == "replace" && id0.isNotEmpty() -> id0
+                mode == "merge" && id0.isNotEmpty() && Courses.all(store).any { it.id == id0 } -> id0
                 else -> pickId(store, id0)
             }
             // 课程资料
@@ -114,10 +154,12 @@ object Importer {
                 } else {
                     packs.put(id, pack)
                     val uc = store.userCourses.firstOrNull { it.id == id } ?: UserCourse(id, title,
-                        c.optString("subtitle"), c.optString("description")).also { store.userCourses.add(it) }
+                        c.optString("subtitle"), c.optString("description"), c.optString("glyph", "book"), c.optString("media")).also { store.userCourses.add(it) }
                     uc.title = title
                     uc.sub = c.optString("subtitle")
                     uc.desc = c.optString("description")
+                    uc.glyph = c.optString("glyph", uc.glyph)
+                    uc.media = c.optString("media", uc.media)
                     uc.packJson = pack.toJson().toString()
                 }
                 out.created += id
@@ -131,6 +173,7 @@ object Importer {
             c.optJSONObject("state")?.let { st -> applyState(store, packs, id, st, mode, out) }
         }
         // 个人设置
+        o.optString("theme").takeIf { it.isNotEmpty() }?.let { store.theme = it }
         o.optJSONObject("personal")?.optJSONObject("ui")?.let { applyUi(store, it) }
         o.optJSONObject("ui")?.let { applyUi(store, it) }
         store.save()
@@ -212,6 +255,8 @@ object Importer {
     private fun applyUi(store: Store, u: JSONObject) {
         u.optString("style").takeIf { it.isNotEmpty() }?.let { store.style = if (it == "minimal") com.qwen.opsmentor.state.StyleMode.MINIMAL else com.qwen.opsmentor.state.StyleMode.PLANET }
         if (u.has("accent")) store.accent = u.optInt("accent").coerceIn(0, 8)
+        if (u.has("accentCustom")) store.accentCustom = u.optString("accentCustom")
+        if (u.has("accentPaletteVersion")) store.accentPaletteVersion = u.optInt("accentPaletteVersion", 1)
         when (u.optString("appearance", "")) {
             "light" -> store.appearance = com.qwen.opsmentor.state.Appearance.LIGHT
             "dark" -> store.appearance = com.qwen.opsmentor.state.Appearance.DARK
@@ -224,18 +269,23 @@ object Importer {
             store.profileName = p.optString("name", store.profileName)
             store.profileBio = p.optString("bio", store.profileBio)
         }
+        u.optString("currentCourse").takeIf { id -> id.isNotEmpty() && Courses.all(store).any { it.id == id } }?.let { store.setCur(it) }
         u.optJSONObject("star")?.let { s -> s.keys().forEach { k -> store.star[k] = s.optInt(k, 1) } }
+        u.optJSONObject("co")?.let { c -> c.keys().forEach { k -> c.optJSONObject(k)?.let { store.co[k] = CoMeta.from(it) } } }
+        u.optJSONArray("deletedCourses")?.let { a -> for (i in 0 until a.length()) if (!store.deletedCourses.contains(a.optString(i))) store.deletedCourses.add(a.optString(i)) }
+        u.optJSONObject("readPos")?.let { a -> a.keys().forEach { k -> store.readPos[k] = a.optInt(k) } }
+        u.optJSONObject("mediaPos")?.let { a -> a.keys().forEach { k -> store.mediaPos[k] = a.optLong(k) } }
+        if (u.has("mediaKeep")) store.mediaKeep = u.optBoolean("mediaKeep", true)
+        if (u.has("topInset")) store.topInset = u.optBoolean("topInset", true)
+        u.optJSONObject("bar")?.let { bar -> store.barX = bar.optDouble("x", -1.0).toFloat(); store.barY = bar.optDouble("y", -1.0).toFloat() }
+        u.optString("ttsVoice").takeIf { it.isNotEmpty() }?.let { store.ttsVoice = it }
         u.optJSONArray("shortcuts")?.let { a ->
             val list = ArrayList<com.qwen.opsmentor.state.Shortcut>()
             for (i in 0 until a.length()) a.optJSONObject(i)?.let { list.add(com.qwen.opsmentor.state.Shortcut.from(it)) }
             if (list.isNotEmpty()) store.shortcuts = list
         }
-        u.optJSONArray("userCourses")?.let { arr ->
-            for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { j ->
-                val uc = UserCourse.from(j)
-                if (store.userCourses.none { it.id == uc.id }) store.userCourses.add(uc)
-            }
-        }
+        // 自建课程已在 courses[] 中按实际冲突策略创建/映射 ID。
+        // 不再从 personal.ui.userCourses 按旧 ID 二次追加，避免合并导入发生 ID 冲突时产生空壳重复课程。
         u.optJSONObject("studyLog")?.let { log -> log.keys().forEach { k -> store.studyLog[k] = log.optInt(k) } }
     }
 
@@ -310,6 +360,19 @@ object Importer {
             val rows = splitCsv(text)
             if (rows.isEmpty()) return JSONObject().put("courses", JSONArray())
             val head = rows.first().map { it.trim() }
+            // 完整档案 CSV：恢复原始 JSON 档案，不降级成单门课程章节表。
+            val archiveIndex = head.indexOf("完整档案JSON").takeIf { it >= 0 }
+                ?: head.indexOf("archive_json").takeIf { it >= 0 }
+            if (archiveIndex != null) {
+                val raw = rows.drop(1).firstOrNull()?.getOrNull(archiveIndex).orEmpty()
+                return try {
+                    val archive = JSONObject(raw)
+                    if (archive.has("courses")) archive
+                    else JSONObject().put("courses", JSONArray())
+                } catch (_: Exception) {
+                    JSONObject().put("courses", JSONArray())
+                }
+            }
             val arr = JSONArray()
             val chapters = JSONArray()
             rows.drop(1).forEach { r ->

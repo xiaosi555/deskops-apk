@@ -7,6 +7,8 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.core.widget.NestedScrollView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.qwen.opsmentor.App
 import com.qwen.opsmentor.core.AnnotatedText
 import com.qwen.opsmentor.core.MarkEditor
@@ -64,10 +66,16 @@ abstract class Page(val act: Activity, val app: App) {
         val c = act
         val box = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            // HTML 星球版 stage 左右留白 20px；极简版为 16px
-            val pad = c.dp(if (Tokens.planet) 20f else 16f)
+            // HTML 最终版两种风格均为 20px，窄屏收窄为 17px；左右再叠加刘海/挖孔安全区。
+            val widthPx = c.window.decorView.width.takeIf { it > 0 } ?: c.resources.displayMetrics.widthPixels
+            val widthDp = widthPx / c.resources.displayMetrics.density
+            val basePad = c.dp(if (widthDp <= 420f) 17f else 20f)
+            val safe = ViewCompat.getRootWindowInsets(c.window.decorView)
+                ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            val leftPad = maxOf(basePad, safe?.left ?: 0)
+            val rightPad = maxOf(basePad, safe?.right ?: 0)
             // HTML stage 底部预留 122px；原生容器已避开 60px 底栏，因此内容补足 62px。
-            setPadding(pad, 0, pad, c.dp(62f))
+            setPadding(leftPad, 0, rightPad, c.dp(62f))
         }
         val owner = (c as? ScrollOwner)
         val sv = object : NestedScrollView(c) {
@@ -87,9 +95,30 @@ abstract class Page(val act: Activity, val app: App) {
         return sv
     }
 
+    /** Insets 更新时重新计算左右安全留白，兼容横屏挖孔与窗口尺寸变化。 */
+    fun updateContentInsets() {
+        val box = content ?: return
+        val widthPx = act.window.decorView.width.takeIf { it > 0 } ?: act.resources.displayMetrics.widthPixels
+        val widthDp = widthPx / act.resources.displayMetrics.density
+        val basePad = act.dp(if (widthDp <= 420f) 17f else 20f)
+        val safe = ViewCompat.getRootWindowInsets(act.window.decorView)
+            ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+        box.setPadding(maxOf(basePad, safe?.left ?: 0), box.paddingTop,
+            maxOf(basePad, safe?.right ?: 0), act.dp(62f))
+    }
+
     /** 整页重绘；keepScroll=false 时回顶部（对应 Web 的 __readTop） */
     fun rerender(toTop: Boolean = false, animateItems: Boolean = false) {
         val box = content ?: return
+        // 搜索框等输入控件会在 TextWatcher 中触发重绘。记录焦点路径与光标，
+        // 避免每输入一个字符就销毁输入框，导致键盘失焦、搜索无法连续输入。
+        val focusedInput = box.findFocus() as? android.widget.EditText
+        val focusPath = focusedInput?.let { childPath(box, it) }
+        val selectionStart = focusedInput?.selectionStart ?: -1
+        val selectionEnd = focusedInput?.selectionEnd ?: -1
+        val imm = act.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+        val restoreIme = focusedInput != null && imm?.isAcceptingText == true
+
         box.removeAllViews()
         blocks.clear()
         body(box)
@@ -108,7 +137,41 @@ abstract class Page(val act: Activity, val app: App) {
             store.readPos[key] = 0
             0
         } else (store.readPos[key] ?: lastY)
-        box.post { scroll?.scrollTo(0, y.coerceAtLeast(0)) }
+        box.post {
+            scroll?.scrollTo(0, y.coerceAtLeast(0))
+            val target = focusPath?.let { viewAtPath(box, it) } as? android.widget.EditText
+            if (target != null) {
+                target.requestFocus()
+                val end = target.text?.length ?: 0
+                if (selectionStart >= 0 && selectionEnd >= 0) {
+                    target.setSelection(selectionStart.coerceAtMost(end), selectionEnd.coerceAtMost(end))
+                }
+                if (restoreIme) target.post { imm?.showSoftInput(target, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT) }
+            }
+        }
+    }
+
+    private fun childPath(root: ViewGroup, target: View): IntArray? {
+        val reversed = ArrayList<Int>()
+        var current: View = target
+        while (current !== root) {
+            val parent = current.parent as? ViewGroup ?: return null
+            val index = parent.indexOfChild(current)
+            if (index < 0) return null
+            reversed.add(index)
+            current = parent
+        }
+        return reversed.asReversed().toIntArray()
+    }
+
+    private fun viewAtPath(root: ViewGroup, path: IntArray): View? {
+        var current: View = root
+        for (index in path) {
+            val parent = current as? ViewGroup ?: return null
+            if (index !in 0 until parent.childCount) return null
+            current = parent.getChildAt(index)
+        }
+        return current
     }
 
     val CUR: String get() = store.cur
@@ -149,7 +212,7 @@ abstract class Page(val act: Activity, val app: App) {
         val hd = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, c.dp(if (big) 26f else 12f), 0, c.dp(4f))
+            setPadding(0, c.dp(if (big) 20f else 12f), 0, c.dp(4f))
         }
         hd.addView(label(c, title, if (big) 29f else 20f, Tokens.ink, Tokens.weightH()).also {
             it.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -194,6 +257,13 @@ abstract class Page(val act: Activity, val app: App) {
             val p = c.dp(11f)
             setPadding(p, p, p, p)
             flat(if (Tokens.planet) Tokens.l3 else Tokens.withAlpha(Tokens.ink, 0.04f), c.dp(10f).toFloat())
+            setOnFocusChangeListener { _, focused ->
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(if (Tokens.planet) Tokens.l3 else Tokens.withAlpha(Tokens.ink, 0.04f))
+                    cornerRadius = c.dp(10f).toFloat()
+                    if (focused) setStroke(c.dp(1f), Tokens.accentLine)
+                }
+            }
             addTextChangedListener(watcher(onChange))
         }
         (host as android.view.ViewGroup).addView(inp, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {

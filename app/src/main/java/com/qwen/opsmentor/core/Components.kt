@@ -323,13 +323,21 @@ class RingView(ctx: Context, var p: Float) : android.view.View(ctx) {
 }
 
 /** 顶部装饰（12 种）：自绘 View，星球版缺省为竖线 */
-class DecoView(ctx: Context, private var kind: String, private val heightPx: Int) : android.view.View(ctx) {
+class DecoView(ctx: Context, private var kind: String, private var heightPx: Int) : android.view.View(ctx) {
 
-    /** 切换装饰类型（设置页选择后立即生效） */
+    /** 切换装饰类型与高度；HTML 背景带高度为安全区 + 150px。 */
     fun update(k: String, h: Int = heightPx) {
-        if (kind == k) return
-        kind = k
-        invalidate()
+        var changed = false
+        if (kind != k) { kind = k; changed = true }
+        if (heightPx != h) {
+            heightPx = h
+            (layoutParams as? ViewGroup.LayoutParams)?.let { lp ->
+                lp.height = h
+                layoutParams = lp
+            } ?: requestLayout()
+            changed = true
+        }
+        if (changed) invalidate()
     }
 
     private fun isNone() = kind == "none"

@@ -211,24 +211,11 @@ object Exporter {
 
     // ---------------- 存档 JSON ----------------
 
-    fun backupJson(store: Store): String {
-        val o = JSONObject()
-        o.put("app", Store.AR_APP)
-        o.put("ver", 4)
-        o.put("kind", "backup")
-        o.put("exportedAt", ISO.format(Date()))
-        o.put("counts", JSONObject()
-            .put("marks", store.allMarks().size)
-            .put("cases", store.cases.size)
-            .put("gloss", store.gloss.size)
-            .put("learned", store.learn.size))
-        o.put("state", stateJson(store, "all"))
-        return o.toString(1)
-    }
+    fun backupJson(store: Store, packs: com.qwen.opsmentor.data.PackRegistry): String = makeArchive(store, packs, "all").put("kind", "backup").toString(1)
 
     /** 与 Web archiveState 同结构 */
-    fun stateJson(store: Store, scope: String): JSONObject {
-        val b = store.bag()
+    fun stateJson(store: Store, scope: String, courseId: String = store.cur): JSONObject {
+        val b = store.bag(courseId)
         val o = JSONObject()
         fun full() {
             o.put("route", b.route).put("idx", b.idx).put("day", b.day).put("mode", b.mode)
@@ -254,12 +241,12 @@ object Exporter {
     }
 
     /** 完整档案：app / kind / ver / scope / exportedAt / counts / courses[] */
-    fun makeArchive(store: Store, packs: com.qwen.opsmentor.data.PackRegistry, scope: String): JSONObject {
-        val co = Courses.find(store, store.cur)
+    private fun makeCourseObject(store: Store, packs: com.qwen.opsmentor.data.PackRegistry, co: Courses.Entry, scope: String): JSONObject {
         val pack = packs.of(store, co.id)
         val (title, sub, cover) = Courses.meta(store, co)
         val c = JSONObject()
         c.put("id", co.id).put("title", title).put("subtitle", sub).put("description", co.desc).put("cover", cover)
+            .put("glyph", Courses.glyph(store, co)).put("media", co.media)
         if (scope == "all" || scope == "course") {
             c.put("modules", JSONArray(pack.mods.map { JSONObject().put("k", it.k).put("n", it.n).put("tag", it.tag) }))
             c.put("chapters", JSONArray(pack.ch.map { ch ->
@@ -292,36 +279,53 @@ object Exporter {
             c.put("lab", JSONArray(pack.lab.map { JSONArray(listOf(it.first, it.second)) }))
         }
         if (scope == "all" || scope == "course" || scope == "handbook") c.put("handbook", manualMd(store, pack, title))
-        val st = stateJson(store, scope)
+        val st = stateJson(store, scope, co.id)
         if (st.length() > 0) c.put("state", st)
-        if (scope == "all") c.put("personal", personalObj(store))
-        val o = JSONObject()
-        o.put("app", Store.AR_APP)
-        o.put("kind", "portable-archive")
-        o.put("ver", Store.AR_VER)
-        o.put("scope", scope)
-        o.put("exportedAt", ISO.format(Date()))
-        o.put("counts", JSONObject()
-            .put("marks", store.marks.size).put("cases", store.cases.size)
-            .put("gloss", store.gloss.size).put("learned", store.learn.size))
-        o.put("courses", JSONArray(listOf(c)))
-        return o
+        return c
+    }
+
+    /** 完整档案；all 会包含每一门课程及其独立学习数据。 */
+    fun makeArchive(store: Store, packs: com.qwen.opsmentor.data.PackRegistry, scope: String): JSONObject {
+        val selected = if (scope == "all") Courses.all(store) else listOf(Courses.find(store, store.cur))
+        val courses = JSONArray()
+        selected.forEach { co -> courses.put(makeCourseObject(store, packs, co, scope)) }
+        val marks = selected.sumOf { store.bag(it.id).marks.size }
+        val cases = selected.sumOf { store.bag(it.id).cases.size }
+        val gloss = selected.sumOf { store.bag(it.id).gloss.size }
+        val learned = selected.sumOf { store.bag(it.id).learn.size }
+        return JSONObject().put("app", Store.AR_APP).put("kind", "portable-archive")
+            .put("ver", Store.AR_VER).put("scope", scope).put("exportedAt", ISO.format(Date()))
+            .put("counts", JSONObject().put("marks", marks).put("cases", cases).put("gloss", gloss).put("learned", learned))
+            .put("courses", courses).put("personal", if (scope == "all") personalObj(store) else JSONObject())
     }
 
     /** 个人数据：整套状态导出（不含媒体文件本体） */
-    fun personalJson(store: Store): String = personalObj(store).toString(1)
+    fun personalJson(store: Store, packs: com.qwen.opsmentor.data.PackRegistry): String = makeArchive(store, packs, "all").put("kind", "personal-backup").toString(1)
 
     private fun personalObj(store: Store): JSONObject {
         val u = JSONObject()
         u.put("style", if (store.style == StyleMode.MINIMAL) "minimal" else "planet")
         u.put("accent", store.accent)
+        u.put("accentCustom", store.accentCustom)
+        u.put("accentPaletteVersion", store.accentPaletteVersion)
         u.put("appearance", store.appearance.name.lowercase())
         u.put("deco", store.deco)
         u.put("profile", JSONObject().put("name", store.profileName).put("bio", store.profileBio).put("avatar", ""))
+        u.put("currentCourse", store.cur)
         u.put("shortcuts", JSONArray(store.shortcuts.map { it.toJson() }))
         u.put("star", JSONObject(store.star as Map<*, *>))
         u.put("cmTab", store.cmTab)
         u.put("ttsRate", store.ttsRate.toDouble())
+        u.put("ttsVoice", store.ttsVoice)
+        u.put("userCourses", JSONArray(store.userCourses.map { it.toJson() }))
+        u.put("deletedCourses", JSONArray(store.deletedCourses))
+        u.put("co", JSONObject().apply { store.co.forEach { (k, v) -> put(k, v.toJson()) } })
+        u.put("readPos", JSONObject(store.readPos as Map<*, *>))
+        u.put("studyLog", JSONObject(store.studyLog as Map<*, *>))
+        u.put("mediaPos", JSONObject(store.mediaPos as Map<*, *>))
+        u.put("mediaKeep", store.mediaKeep)
+        u.put("topInset", store.topInset)
+        u.put("bar", JSONObject().put("x", store.barX.toDouble()).put("y", store.barY.toDouble()))
         return JSONObject().put("ui", u).put("theme", store.theme)
     }
 
@@ -333,7 +337,15 @@ object Exporter {
         val name = "$title-${e.name}-${Store.today()}." + EXT[format]!!.first
         val text = when (format) {
             "json" -> o.toString(1)
-            "md" -> archiveMd(o, scope)
+            "md" -> if (scope == "all") {
+                val all = o.optJSONArray("courses") ?: JSONArray()
+                val readable = (0 until all.length()).mapNotNull { all.optJSONObject(it) }.joinToString("\n\n---\n\n") { course ->
+                    archiveMd(JSONObject(o.toString()).put("courses", JSONArray().put(course)), "all")
+                }
+                // 保留可读正文，同时嵌入完整档案数据块，供本应用再次导入时无损恢复。
+                readable + "\n\n---\n\n## 可恢复的完整档案数据\n\n" +
+                    "````opsmentor-json\n" + o.toString() + "\n````"
+            } else archiveMd(o, scope)
             else -> archiveCsv(o, scope)
         }
         return Pair(name, text)
@@ -352,7 +364,11 @@ object Exporter {
         }
         if (scope == "handbook" || scope == "all") {
             val hb = c.optString("handbook")
-            if (hb.isNotEmpty()) { out.add(""); out.add(hb); return out.joinToString("\n") }
+            if (hb.isNotEmpty()) {
+                out.add("")
+                out.add(hb)
+                if (scope == "handbook") return out.joinToString("\n")
+            }
         }
         c.optJSONArray("chapters")?.let { a ->
             out.add(""); out.add("## 章节目录")
@@ -394,6 +410,14 @@ object Exporter {
 
     /** 档案 → CSV */
     fun archiveCsv(o: JSONObject, scope: String): String {
+        // 全量 CSV 使用单行 JSON 信封，确保多课程、各自学习状态和个人设置可无损往返。
+        // 仍是标准 CSV（正确转义逗号、引号与换行），避免把多门课程压成第一门。
+        if (scope == "all") {
+            return csvOf(listOf(
+                listOf("格式", "版本", "完整档案JSON"),
+                listOf("OpsMentorArchive", o.optInt("ver", Store.AR_VER).toString(), o.toString())
+            ))
+        }
         val c = o.optJSONArray("courses")?.optJSONObject(0) ?: return ""
         val rows = ArrayList<List<String>>()
         val st = c.optJSONObject("state")

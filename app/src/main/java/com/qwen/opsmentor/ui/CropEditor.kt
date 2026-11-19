@@ -28,6 +28,7 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * 图片编辑器（对应 Web v19 openCropModal）：
@@ -54,9 +55,10 @@ object CropEditor {
         top.addView(label(ctx, "调整图片", 15.5f, Tokens.ink, Tokens.weightH()).also {
             it.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         })
+        var commitCrop: (() -> Unit)? = null
         val ok = label(ctx, " 完成 ", 14f, Tokens.onPri, Tokens.weightS())
         ok.flat(Tokens.pri, 8f)
-        ok.setOnClickListener { finish(ctx, act, d, src, size, onDone) }
+        ok.setOnClickListener { commitCrop?.invoke() }
         top.addView(ok)
         col.addView(top)
         // 舞台
@@ -143,6 +145,15 @@ object CropEditor {
             clamp(); paint()
         }
 
+        // 按当前取景框反算原图坐标；完成时必须保存用户实际调整后的裁切结果。
+        commitCrop = {
+            if (frame.side <= 0f || s <= 0f) {
+                Sheets.toast(ctx, "图片尚未准备好，请稍后再试")
+            } else {
+                finish(ctx, act, d, img, size, frame.left, frame.top, frame.side, s, tx, ty, onDone)
+            }
+        }
+
         tool("rotateCw", "旋转") {
             val m = Matrix(); m.postRotate(90f)
             img = Bitmap.createBitmap(img, 0, 0, img.width, img.height, m, true)
@@ -202,10 +213,24 @@ object CropEditor {
         }
     }
 
-    private fun finish(ctx: Context, act: android.app.Activity, d: Dialog, src: Bitmap, size: Int, onDone: (String) -> Unit) {
-        // 取景框为正方形，按当前缩放与位移采样
+    private fun finish(
+        ctx: Context, act: android.app.Activity, d: Dialog, image: Bitmap, size: Int,
+        frameLeft: Float, frameTop: Float, frameSide: Float, scale: Float,
+        translateX: Float, translateY: Float, onDone: (String) -> Unit,
+    ) {
+        // ImageView 的 Matrix 为 bitmap * scale + translate；反算取景框在原图中的正方形区域。
+        val side = (frameSide / scale).roundToInt().coerceIn(1, min(image.width, image.height))
+        val left = ((frameLeft - translateX) / scale).roundToInt().coerceIn(0, image.width - side)
+        val top = ((frameTop - translateY) / scale).roundToInt().coerceIn(0, image.height - side)
+        val cropped = try {
+            Bitmap.createBitmap(image, left, top, side, side)
+        } catch (_: Exception) {
+            Sheets.toast(ctx, "裁切失败，请重新调整图片")
+            return
+        }
         val host = act as? MainActivity
-        val path = host?.saveImage(src, size)
+        val path = host?.saveImage(cropped, size)
+        cropped.recycle()
         if (path == null) { Sheets.toast(ctx, "保存失败"); return }
         d.dismiss()
         onDone(path)
