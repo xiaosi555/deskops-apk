@@ -243,7 +243,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                     preparedVideoPlayer = mp
                     applyRate(mp)
                     restorePos(ch)
-                    val shouldStart = autoplay || pendingVideoStart
+                    val shouldStart = pendingVideoStart
                     pendingVideoStart = false
                     paused = !shouldStart
                     if (shouldStart) start()
