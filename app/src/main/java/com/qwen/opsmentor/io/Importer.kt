@@ -43,7 +43,7 @@ object Importer {
         val t = raw.trim()
         if (t.isEmpty()) return Parsed(JSONObject(), "内容为空", fileName = fileName)
         // 完整 Markdown 档案含可恢复数据块；优先读取该块，避免解析时丢失状态与个人设置。
-        val embedded = Regex("(?s)```opsmentor-json\\s*(.*?)\\s*```").find(t)
+        val embedded = Regex("(?s)````opsmentor-json\\s*(.*?)\\s*````").find(t)
         if (embedded != null) {
             val archive = try { JSONObject(embedded.groupValues[1]) } catch (e: Exception) {
                 return Parsed(JSONObject(), "Markdown 档案数据块损坏", fileName = fileName)
