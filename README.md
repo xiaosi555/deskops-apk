@@ -1,72 +1,51 @@
-# 桌面运维全能学习导师 · Android 原生版
+# 桌面运维全能学习导师 · Android 原生重构工程
 
-由 Web 单文件应用 `桌面运维_星球主题版261113_v6.html` 逆向移植的原生工程。**功能与 UI 与 Web 版保持一致**，学习存档格式互通，可双向导入导出。
+本仓库目标是将根目录中的 `桌面运维_星球主题版261113_v6.html` 完整迁移为 Kotlin 原生 Android 应用。
 
-## 1 构建
+> **重要：当前版本仍处于原生重构阶段。** 现有 APK 曾成功编译，但用户反馈 UI 与 HTML 基准差异明显，视频导入也未通过真实设备验收。因此不能将当前版本描述为与 Web 版完全一致或所有功能均已验证。编译成功不等于功能完成。
 
-要求：Android Studio Hedgehog+（或 Gradle 8.2+ / JDK 17）。
+## 强制开发规范
 
-```bash
-# 目录内未附带 gradle wrapper jar，二选一
-gradle wrapper --gradle-version 8.4      # 生成 wrapper
-./gradlew :app:assembleDebug             # 构建 debug apk
-# 或直接用 Android Studio 打开本目录，Sync 后 Run
-```
+后续开发必须严格执行：
 
-- `compileSdk 34` / `minSdk 24` / `targetSdk 34`
-- 依赖仅 AndroidX：core-ktx、appcompat、activity-ktx、fragment-ktx、recyclerview、constraintlayout
-- 无网络、无统计、无云同步、无 ExoPlayer、无图片库；`assets/course_ops.json`（217KB）为内置课程数据
+- [Android 原生重构技术规范](docs/ANDROID_NATIVE_REBUILD_SPEC.md)
 
-## 2 目录
+开发顺序固定为：
 
-```text
-app/src/main/
-├─ AndroidManifest.xml
-├─ assets/course_ops.json              # 7 模块 / 30 章 / 219 知识详解 / 84 输出样例 / 4 路线
-├─ java/com/qwen/opsmentor/
-│  ├─ App.kt                            # 全局：Store + PackRegistry + 主题 + 计时 + 朗读
-│  ├─ core/  Tokens Dsl Components Sheets Selection MarkEngine AnnotatedText Icons Pages Reader StudyTimer
-│  ├─ data/  Pack PackRegistry Lecture
-│  ├─ state/ Store Records Courses ReviewEngine
-│  ├─ io/    Exporter Importer Saver
-│  ├─ media/ MediaCourses                # SAF 视频 / 音频课程建课、副本、首帧封面
-│  └─ ui/    MainActivity Page Rows MiniBar Editor CropEditor ShortcutsEdit
-│     └─ pages/ 20 个页面（课程 / 我的 / 课程详情 / 章节学习 / 知识详解 / 复习队列 / 案例库 /
-│                术语手册 / 排障手册 / 学习进度 / 我的划线两层 / 数据 / 个人数据 / 学习日历 /
-│                课程管理 / 导入课程 / 设置 / 快捷入口 / 播放页）
-└─ res/ drawable（87 个由 Web SVG path 自动转换的 Vector Drawable）+ values + xml + mipmap
-tools/
-├─ build-assets.cjs    # 从基准 HTML 抽取课程数据与图标（node tools/build-assets.cjs）
-├─ ktcheck.py         # Kotlin 括号 / 引号配平自检
-└─ xref.py            # 包内符号交叉引用自检
-```
+1. **Phase A：原生代码框架** — 分层、导航、状态、数据仓储、存储/媒体接口和测试骨架。
+2. **Phase B：UI 逐页重建** — 按 HTML 页面、组件、主题、交互和动效逐项对照实现。
+3. **Phase C：功能联调与测试** — 贯通页面到数据/平台层，尤其验证媒体导入、播放和恢复。
+4. **Phase D：APK 构建** — 只有前三阶段验收通过后才构建 APK，并交付完整源码 ZIP。
 
-## 3 与 Web 版的对应关系
+任何阶段未通过验收，不得跳过阶段或为了“有提交”而构建 APK。
 
-| Web | Android |
-| --- | --- |
-| `localStorage dlmentor.v3` 单 JSON | `SharedPreferences` 同键同结构（`state/Store.kt`），存档可互导 |
-| CSS 变量 `--l0..--l3 --pri` | `core/Tokens.kt` 运行期计算（含 WCAG on-pri、暗色降字重、双风格、9 色板） |
-| `cubic-bezier(.22,.74,.18,1)` / `(.32,1.34,.5,1)` | `SNAP` / `POP` PathInterpolator |
-| `renderXxx()` 动态建 DOM | `Page.body(host)` 动态建 View，整页重绘 |
-| `[data-blk]` + `segs{sig,s,e,txt,pre,post}` | `AnnotatedText` + `MarkEngine`（FNV-1a 签名 + 上下文打分纠偏） |
-| 浮动划线工具条（可拖拽、位置持久化） | `SelectionBar`（长按命中整句 + 按字符微调 + 整段） |
-| Blob 下载 / File System Access | SAF `CreateDocument` / `OpenDocumentTree` + 权限持久化 |
-| Web Speech TTS | `android.speech.tts.TextToSpeech` |
-| IndexedDB 文件副本 | `filesDir/media/<courseId>/` 副本 + `MediaMetadataRetriever` 首帧 |
-| 打印版手册 | 复制全文 / 系统分享（PrintManager 待补，见 PRD §16.2） |
+## 当前工程基线
 
-## 4 已实现 / 待补
+- Android 原生：Kotlin + AndroidX View
+- namespace / applicationId：`com.qwen.opsmentor`
+- compileSdk：34
+- minSdk：24
+- JDK：17
+- HTML 基准：`桌面运维_星球主题版261113_v6.html`
+- 内置课程数据：`app/src/main/assets/course_ops.json`
 
-已实现：PRD §13.1 的 10 条主流程走查项；全部 19 个页面路由；划线引擎与分层绘制；间隔提取；案例五栏与编号规则；术语手册；排障手册；学习进度；学习日历（日/周/月/年 + 自动计时 + 校正）；课程管理与导入（文字 JSON/MD/CSV、视频/音频文件夹）；数据 6 类档案 × 3 格式导出预览与导入合并/覆盖；主题色 / 明暗 / 星球版·极简版 / 12 种顶部装饰；迷你继续学习条横滑丢弃；朗读与媒体互斥。
+现有代码包含 Activity、页面类、Store、导入导出、SAF 媒体扫描和播放器等实现。这些是待审计与重构的现状，不代表已通过新的架构、UI 或真机功能验收。
 
-待补（V1.1，见 PRD §16.2）：跨段落合并为一条划线、视频手动选帧封面、PrintManager 打印版、TTS 引擎/音色选择、动态装饰着色器级还原、API 31+ 背景模糊。
+## 媒体导入特别说明
 
-## 5 静态自检
+视频/音频在本产品中是**本地文件导入**，不是上传到服务器。必须通过 Android SAF 选择文件或文件夹，保存有效 URI 授权，并验证文件能被读取、建立课程、打开播放。复制到应用内部存储是可选能力，不能把课程条目创建成功误认为文件复制成功。
+
+## 自动检查
+
+当前仓库保留静态检查脚本：
 
 ```bash
-python3 tools/ktcheck.py app/src/main/java   # 括号 / 字符串配平：0 issues
-python3 tools/xref.py app/src/main/java      # 包内符号引用检查
+python3 tools/ktcheck.py app/src/main/java
+python3 tools/xref.py app/src/main/java
 ```
 
-本工程的静态检查已通过；未在构建环境（无 Android SDK）中做真机编译验证，首次在 Android Studio 中 Sync 时若有个别 API 版本兼容告警，按提示微调即可。
+这些检查只能证明部分源码结构/引用条件，不代替 Android 编译、UI 对照、媒体端到端测试或真机验收。
+
+## 构建说明
+
+在 Phase A、B、C 均通过之前，不应执行 APK 发布构建。开发阶段的检查可以使用 Kotlin 编译、Lint、单元测试等轻量任务，但不得将其包装成可交付 APK 的完成证明。
