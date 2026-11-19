@@ -57,6 +57,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     private var videoPrepared = false
     private var pendingVideoStart = false
     private var playbackCompleted = false
+    private var playbackError = false
     private var activeChapterId = ""
     private var lastPositionSaveAt = 0L
     private var autoplayOnRender = false
@@ -233,6 +234,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         activeChapterId = ch.id
         lastPositionSaveAt = android.os.SystemClock.elapsedRealtime()
         playbackCompleted = false
+        playbackError = false
         pendingAudioStart = autoplay
         val uri = if (src.startsWith("/")) Uri.fromFile(File(src)) else Uri.parse(src)
         val co = Courses.find(store, store.cur)
@@ -263,6 +265,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                 setOnErrorListener { _, _, _ ->
                     videoPrepared = false
                     pendingVideoStart = false
+                    playbackError = true
                     paused = true
                     paintPlay()
                     Sheets.toast(ctx, "这个格式在当前设备上播放失败，建议用 mp4")
@@ -296,6 +299,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
                     setOnErrorListener { mp, _, _ ->
                         audioPrepared = false
                         pendingAudioStart = false
+                        playbackError = true
                         paused = true
                         runCatching { mp.reset(); mp.release() }
                         if (player === mp) player = null
@@ -403,8 +407,14 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
     }
 
     private fun restorePos(ch: com.qwen.opsmentor.data.Chapter) {
-        val ms = (store.mediaPos["${store.cur}:${ch.id}"] ?: 0L).toInt()
-        if (ms > 0) runCatching { seekTo(ms) }
+        val key = "${store.cur}:${ch.id}"
+        val ms = (store.mediaPos[key] ?: 0L).coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val d = duration()
+        // 已经播放完的章节再次打开时从头开始，而不是停留在结尾无法启动。
+        if (d > 0 && ms >= d - 500) {
+            store.mediaPos[key] = 0L
+            store.save()
+        } else if (ms > 0) runCatching { seekTo(ms) }
     }
 
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -474,6 +484,7 @@ class PagePlayer(act: Activity, app: App) : Page(act, app) {
         videoPrepared = false
         pendingVideoStart = false
         playbackCompleted = false
+        playbackError = false
         preparedVideoPlayer = null
         paused = true
         activeChapterId = ""
