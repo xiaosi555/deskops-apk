@@ -110,9 +110,8 @@ object MediaCourses {
     }
 
     private fun naturalKey(name: String): String {
-        val m = Regex("(\\d+)").findAll(name.substringBeforeLast('.')).map { it.value.toInt() }.toList()
-        val p = if (m.isEmpty()) intArrayOf() else m.toIntArray()
-        return p.joinToString("-") { it.toString().padStart(6, '0') } + "#" + name.lowercase()
+        val parts = Regex("(\\d+)").findAll(name.substringBeforeLast('.')).map { it.value.trimStart('0').ifEmpty { "0" } }.toList()
+        return parts.joinToString("-") { it.padStart(6, '0') } + "#" + name.lowercase()
     }
 
     private fun queryName(ctx: Context, uri: Uri): String? {
@@ -244,10 +243,9 @@ object MediaCourses {
         }
         treeUris.forEach { raw ->
             runCatching {
-                ctx.contentResolver.releasePersistableUriPermission(
-                    Uri.parse(raw),
-                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
+                val uri = Uri.parse(raw)
+                runCatching { ctx.contentResolver.releasePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                runCatching { ctx.contentResolver.releasePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
             }
         }
     }
