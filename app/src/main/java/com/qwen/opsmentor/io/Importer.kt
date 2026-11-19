@@ -110,7 +110,7 @@ object Importer {
             val isBuiltin = Courses.builtin.any { it.id == id0 } && id0 != ""
             val id = when {
                 isBuiltin && (scope == "all" || scope == "course") -> id0
-                else -> pickId(store, id0)
+                else -> if (mode == "replace" && id0.isNotEmpty()) id0 else pickId(store, id0)
             }
             // 课程资料
             if ((scope == "all" || scope == "course") && (c.has("chapters") || c.has("ch") || c.has("handbook"))) {
@@ -121,10 +121,12 @@ object Importer {
                 } else {
                     packs.put(id, pack)
                     val uc = store.userCourses.firstOrNull { it.id == id } ?: UserCourse(id, title,
-                        c.optString("subtitle"), c.optString("description")).also { store.userCourses.add(it) }
+                        c.optString("subtitle"), c.optString("description"), c.optString("glyph", "book"), c.optString("media")).also { store.userCourses.add(it) }
                     uc.title = title
                     uc.sub = c.optString("subtitle")
                     uc.desc = c.optString("description")
+                    uc.glyph = c.optString("glyph", uc.glyph)
+                    uc.media = c.optString("media", uc.media)
                     uc.packJson = pack.toJson().toString()
                 }
                 out.created += id
@@ -232,6 +234,12 @@ object Importer {
             store.profileBio = p.optString("bio", store.profileBio)
         }
         u.optJSONObject("star")?.let { s -> s.keys().forEach { k -> store.star[k] = s.optInt(k, 1) } }
+        u.optJSONObject("co")?.let { c -> c.keys().forEach { k -> c.optJSONObject(k)?.let { store.co[k] = CoMeta.from(it) } } }
+        u.optJSONArray("deletedCourses")?.let { a -> for (i in 0 until a.length()) if (!store.deletedCourses.contains(a.optString(i))) store.deletedCourses.add(a.optString(i)) }
+        u.optJSONObject("readPos")?.let { a -> a.keys().forEach { k -> store.readPos[k] = a.optInt(k) } }
+        u.optJSONObject("mediaPos")?.let { a -> a.keys().forEach { k -> store.mediaPos[k] = a.optLong(k) } }
+        if (u.has("mediaKeep")) store.mediaKeep = u.optBoolean("mediaKeep", true)
+        u.optString("ttsVoice").takeIf { it.isNotEmpty() }?.let { store.ttsVoice = it }
         u.optJSONArray("shortcuts")?.let { a ->
             val list = ArrayList<com.qwen.opsmentor.state.Shortcut>()
             for (i in 0 until a.length()) a.optJSONObject(i)?.let { list.add(com.qwen.opsmentor.state.Shortcut.from(it)) }
