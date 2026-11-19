@@ -330,6 +330,19 @@ object Importer {
             val rows = splitCsv(text)
             if (rows.isEmpty()) return JSONObject().put("courses", JSONArray())
             val head = rows.first().map { it.trim() }
+            // 完整档案 CSV：恢复原始 JSON 档案，不降级成单门课程章节表。
+            val archiveIndex = head.indexOf("完整档案JSON").takeIf { it >= 0 }
+                ?: head.indexOf("archive_json").takeIf { it >= 0 }
+            if (archiveIndex != null) {
+                val raw = rows.drop(1).firstOrNull()?.getOrNull(archiveIndex).orEmpty()
+                return try {
+                    val archive = JSONObject(raw)
+                    if (archive.has("courses")) archive
+                    else JSONObject().put("courses", JSONArray())
+                } catch (_: Exception) {
+                    JSONObject().put("courses", JSONArray())
+                }
+            }
             val arr = JSONArray()
             val chapters = JSONArray()
             rows.drop(1).forEach { r ->
