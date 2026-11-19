@@ -338,9 +338,12 @@ object Exporter {
             "json" -> o.toString(1)
             "md" -> if (scope == "all") {
                 val all = o.optJSONArray("courses") ?: JSONArray()
-                (0 until all.length()).mapNotNull { all.optJSONObject(it) }.joinToString("\n\n---\n\n") { course ->
+                val readable = (0 until all.length()).mapNotNull { all.optJSONObject(it) }.joinToString("\n\n---\n\n") { course ->
                     archiveMd(JSONObject(o.toString()).put("courses", JSONArray().put(course)), "all")
                 }
+                // 保留可读正文，同时嵌入完整档案数据块，供本应用再次导入时无损恢复。
+                readable + "\n\n---\n\n## 可恢复的完整档案数据\n\n" +
+                    "```opsmentor-json\n" + o.toString() + "\n```"
             } else archiveMd(o, scope)
             else -> archiveCsv(o, scope)
         }
