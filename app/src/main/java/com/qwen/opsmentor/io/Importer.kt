@@ -278,12 +278,8 @@ object Importer {
             for (i in 0 until a.length()) a.optJSONObject(i)?.let { list.add(com.qwen.opsmentor.state.Shortcut.from(it)) }
             if (list.isNotEmpty()) store.shortcuts = list
         }
-        u.optJSONArray("userCourses")?.let { arr ->
-            for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { j ->
-                val uc = UserCourse.from(j)
-                if (store.userCourses.none { it.id == uc.id }) store.userCourses.add(uc)
-            }
-        }
+        // 自建课程已在 courses[] 中按实际冲突策略创建/映射 ID。
+        // 不再从 personal.ui.userCourses 按旧 ID 二次追加，避免合并导入发生 ID 冲突时产生空壳重复课程。
         u.optJSONObject("studyLog")?.let { log -> log.keys().forEach { k -> store.studyLog[k] = log.optInt(k) } }
     }
 
