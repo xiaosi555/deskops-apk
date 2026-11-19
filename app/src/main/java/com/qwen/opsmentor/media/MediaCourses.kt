@@ -2,6 +2,7 @@ package com.qwen.opsmentor.media
 import com.qwen.opsmentor.data.toJson
 
 import android.content.Context
+import android.util.Base64
 import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -60,13 +61,13 @@ object MediaCourses {
                     val iMime = c.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
                     if (iId < 0 || iName < 0 || iMime < 0) return@use
 
-                    while (c.moveToNext()) {
+                    while (c.moveToNext() && out.size < 5000) {
                         val documentId = c.getString(iId) ?: continue
                         val name = c.getString(iName) ?: continue
                         val mime = if (iMime >= 0) c.getString(iMime).orEmpty() else ""
                         if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
                             // 根目录下的一层子目录也纳入扫描；不无限递归，避免误扫大型媒体库。
-                            if (depth < 1) scanDirectory(documentId, depth + 1)
+                            if (depth < 8 && out.size < 5000) scanDirectory(documentId, depth + 1)
                             continue
                         }
                         val matchesMime = (kind == "video" && mime.startsWith("video/")) ||
@@ -212,19 +213,43 @@ object MediaCourses {
         return done
     }
 
-    fun dir(ctx: Context, courseId: String): File = File(ctx.filesDir, "media/$courseId").apply { mkdirs() }
+    private fun courseFolderId(courseId: String): String {
+        return if (courseId.matches(Regex("[A-Za-z0-9._-]{1,120}")) && courseId != "." && courseId != "..") courseId
+        else "id_" + Base64.encodeToString(courseId.toByteArray(Charsets.UTF_8), Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+    }
+
+    fun dir(ctx: Context, courseId: String): File = File(File(ctx.filesDir, "media"), courseFolderId(courseId)).apply { mkdirs() }
 
     /** 删除课程时只清理本应用私有副本，不触碰用户原始 SAF 文件。 */
     fun deleteLocal(ctx: Context, store: Store, courseId: String) {
         runCatching {
             val root = File(ctx.filesDir, "media").canonicalFile
-            val target = File(root, courseId).canonicalFile
+            val target = File(root, courseFolderId(courseId)).canonicalFile
             if (target.parentFile == root && target.exists()) target.deleteRecursively()
         }
         store.mediaTrees.remove(courseId)
         val prefix = "$courseId:"
         store.mediaPos.keys.filter { it.startsWith(prefix) }.toList().forEach { store.mediaPos.remove(it) }
         store.save()
+    }
+
+
+    fun clearLocalCopies(ctx: Context, courseIds: Collection<String>, treeUris: Collection<String>) {
+        courseIds.forEach { id ->
+            runCatching {
+                val root = File(ctx.filesDir, "media").canonicalFile
+                val target = File(root, courseFolderId(id)).canonicalFile
+                if (target.parentFile == root && target.exists()) target.deleteRecursively()
+            }
+        }
+        treeUris.forEach { raw ->
+            runCatching {
+                ctx.contentResolver.releasePersistableUriPermission(
+                    Uri.parse(raw),
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+        }
     }
 
     /** 播放地址：优先应用内副本，其次原始 uri */
