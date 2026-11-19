@@ -2,7 +2,7 @@ name: Android APK
 
 on:
   push:
-    branches: [main, fix/html-parity-full-rebuild]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
