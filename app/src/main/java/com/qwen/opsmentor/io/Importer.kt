@@ -1,4 +1,7 @@
 package com.qwen.opsmentor.io
+
+import android.content.Context
+import com.qwen.opsmentor.media.MediaCourses
 import com.qwen.opsmentor.data.toJson
 
 import com.qwen.opsmentor.data.Chapter
@@ -106,12 +109,15 @@ object Importer {
     }
 
     /** 应用档案：merge 合并 / replace 覆盖 */
-    fun apply(store: Store, packs: PackRegistry, o: JSONObject, mode: String): ApplyResult {
+    fun apply(ctx: Context, store: Store, packs: PackRegistry, o: JSONObject, mode: String): ApplyResult {
         val out = ApplyResult()
         val courses = o.optJSONArray("courses") ?: return out
         val scope = o.optString("scope", "all")
         if (mode == "replace" && scope == "all") {
             // 完整档案覆盖 = 替换整套课程集合与学习状态，而不只是覆盖同 ID 的课程。
+            val oldCourseIds = store.userCourses.map { it.id }
+            val oldTreeUris = store.mediaTrees.values.toList()
+            MediaCourses.clearLocalCopies(ctx, oldCourseIds, oldTreeUris)
             store.userCourses.forEach { packs.evict(it.id) }
             store.userCourses.clear()
             store.bags.clear()
