@@ -178,7 +178,8 @@ class PageIo(act: Activity, app: App) : Page(act, app) {
 
     private fun hint(scope: String, fmt: String): String = when (fmt) {
         "json" -> "UTF-8 编码的 ${if (scope == "all") "完整档案" else Exporter.entry(scope)?.name}，字段结构与 Web 版一致，可在另一端「导入档案」原样恢复。"
-        "md" -> "可读文档：标题层级与表格排版与学习手册一致，可粘进笔记软件或转 PDF。"
+        "md" -> if (scope == "all") "可读文档正文 + 可恢复的完整档案数据块；再次导入本应用可还原多门课程、学习记录与个人设置。"
+            else "可读文档：标题层级与表格排版与学习手册一致，可粘进笔记软件或转 PDF。"
         else -> if (scope == "all") "完整档案 CSV：以标准 CSV 封装完整 JSON，保留全部课程、各课程学习状态与个人设置，可再次导入恢复；Excel / WPS 可打开查看。"
             else "CSV 带 UTF-8 BOM，Excel / WPS 直接打开不乱码；适合逐条查看与整理。"
     }
