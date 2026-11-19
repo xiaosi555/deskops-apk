@@ -243,7 +243,7 @@ class PageIo(act: Activity, app: App) : Page(act, app) {
         val go = btn(ctx, "应用存档", "pri")
         go.setOnClickListener {
             try {
-                val r = Importer.apply(store, app.packs, p.obj, impMode)
+                val r = Importer.apply(ctx, store, app.packs, p.obj, impMode)
                 app.retheme()
                 msg = r.summaryText()
                 parsed = null; impText = ""
@@ -985,7 +985,7 @@ class PageCourseImport(act: Activity, app: App) : Page(act, app) {
                 val p = Importer.parse(text)
                 if (p.err.isNotEmpty()) { Sheets.toast(ctx, if (p.err.length > 26) p.err.take(26) + "…" else p.err); return@setOnClickListener }
                 if (!p.full) { Sheets.toast(ctx, "这是局部档案（划线 / 进度 / 案例），请到「数据 → 导入档案」导入"); return@setOnClickListener }
-                val r = Importer.apply(store, app.packs, p.obj, "merge")
+                val r = Importer.apply(ctx, store, app.packs, p.obj, "merge")
                 if (r.created.isEmpty()) { Sheets.toast(ctx, "没有可导入的课程（需要 title）"); return@setOnClickListener }
                 r.created.forEach { id ->
                     store.co[id] = (store.co[id] ?: com.qwen.opsmentor.state.CoMeta()).apply { glyph = this@PageCourseImport.glyph }
