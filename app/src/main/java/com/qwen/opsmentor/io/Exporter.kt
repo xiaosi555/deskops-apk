@@ -306,6 +306,8 @@ object Exporter {
         val u = JSONObject()
         u.put("style", if (store.style == StyleMode.MINIMAL) "minimal" else "planet")
         u.put("accent", store.accent)
+        u.put("accentCustom", store.accentCustom)
+        u.put("accentPaletteVersion", store.accentPaletteVersion)
         u.put("appearance", store.appearance.name.lowercase())
         u.put("deco", store.deco)
         u.put("profile", JSONObject().put("name", store.profileName).put("bio", store.profileBio).put("avatar", ""))
@@ -321,6 +323,8 @@ object Exporter {
         u.put("studyLog", JSONObject(store.studyLog as Map<*, *>))
         u.put("mediaPos", JSONObject(store.mediaPos as Map<*, *>))
         u.put("mediaKeep", store.mediaKeep)
+        u.put("topInset", store.topInset)
+        u.put("bar", JSONObject().put("x", store.barX.toDouble()).put("y", store.barY.toDouble()))
         return JSONObject().put("ui", u).put("theme", store.theme)
     }
 
