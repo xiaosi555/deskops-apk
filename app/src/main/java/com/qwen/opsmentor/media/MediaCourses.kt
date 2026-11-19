@@ -221,11 +221,7 @@ object MediaCourses {
 
     /** 删除课程时只清理本应用私有副本，不触碰用户原始 SAF 文件。 */
     fun deleteLocal(ctx: Context, store: Store, courseId: String) {
-        runCatching {
-            val root = File(ctx.filesDir, "media").canonicalFile
-            val target = File(root, courseFolderId(courseId)).canonicalFile
-            if (target.parentFile == root && target.exists()) target.deleteRecursively()
-        }
+        clearLocalCopies(ctx, listOf(courseId), listOfNotNull(store.mediaTrees[courseId]))
         store.mediaTrees.remove(courseId)
         val prefix = "$courseId:"
         store.mediaPos.keys.filter { it.startsWith(prefix) }.toList().forEach { store.mediaPos.remove(it) }
