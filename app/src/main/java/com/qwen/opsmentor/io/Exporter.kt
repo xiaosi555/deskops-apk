@@ -336,7 +336,12 @@ object Exporter {
         val name = "$title-${e.name}-${Store.today()}." + EXT[format]!!.first
         val text = when (format) {
             "json" -> o.toString(1)
-            "md" -> archiveMd(o, scope)
+            "md" -> if (scope == "all") {
+                val all = o.optJSONArray("courses") ?: JSONArray()
+                (0 until all.length()).mapNotNull { all.optJSONObject(it) }.joinToString("\n\n---\n\n") { course ->
+                    archiveMd(JSONObject(o.toString()).put("courses", JSONArray().put(course)), "all")
+                }
+            } else archiveMd(o, scope)
             else -> archiveCsv(o, scope)
         }
         return Pair(name, text)
@@ -355,7 +360,11 @@ object Exporter {
         }
         if (scope == "handbook" || scope == "all") {
             val hb = c.optString("handbook")
-            if (hb.isNotEmpty()) { out.add(""); out.add(hb); return out.joinToString("\n") }
+            if (hb.isNotEmpty()) {
+                out.add("")
+                out.add(hb)
+                if (scope == "handbook") return out.joinToString("\n")
+            }
         }
         c.optJSONArray("chapters")?.let { a ->
             out.add(""); out.add("## 章节目录")
